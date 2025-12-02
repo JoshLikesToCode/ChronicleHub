@@ -1,0 +1,105 @@
+# ---------------------------------------
+# JetBrains Rider / IntelliJ
+# ---------------------------------------
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Rider caches and workspace
+.idea/**/workspace.xml
+.idea/**/tasks.xml
+.idea/**/gradle.xml
+.idea/**/libraries
+.idea/httpRequests/
+.idea/dictionaries/
+
+# ---------------------------------------
+# .NET & C# build artifacts
+# ---------------------------------------
+# Ignore ALL bin/ and obj/ folders everywhere
+**/bin/
+**/obj/
+bin/
+obj/
+
+# Build outputs
+[Bb]uild/
+[Ll]og/
+[Ll]ogs/
+[Tt]est[Rr]esults/
+artifacts/
+
+# ASP.NET Core generated stuff
+wwwroot/lib/
+wwwroot/dist/
+
+# Local config overrides
+appsettings.Development.json
+appsettings.Local.json
+
+# SQLite or local dev DB files
+*.db
+*.db-shm
+*.db-wal
+
+# EF Migrations bundle (optional)
+*_efbundle/
+Migrations/
+
+# NuGet
+*.nupkg
+*.snupkg
+packages/
+.nuget/
+project.lock.json
+project.fragment.lock.json
+
+# Dotnet tools
+.dotnet-tools.json
+
+# ---------------------------------------
+# OS-level junk
+# ---------------------------------------
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Linux swap
+*.swp
+*.swo
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# ---------------------------------------
+# Logs & Temporary Files
+# ---------------------------------------
+*.log
+*.tlog
+*.tmp
+*.temp
+*.pid
+*.lock
+
+# ---------------------------------------
+# Docker
+# ---------------------------------------
+docker-data/
+docker-compose.override.yml
+
+# ---------------------------------------
+# Env files
+# ---------------------------------------
+.env
+.env.*
+.env.local
+.env.*.local
+
+# ---------------------------------------
+# Optional: JetBrains inspection profiles
+# ---------------------------------------
+.idea/inspectionProfiles/
