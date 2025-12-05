@@ -1,4 +1,4 @@
-namespace ChronicleHub.Domain;
+namespace ChronicleHub.Domain.Entities;
 
 public sealed class ActivityEvent
 {
