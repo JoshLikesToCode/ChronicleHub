@@ -1,6 +1,6 @@
 @ChronicleHub.Api_HostAddress = http://localhost:5030
 
-GET {{ChronicleHub.Api_HostAddress}}/weatherforecast/
+GET {{ChronicleHub.Api_HostAddress}}/api/ping/
 Accept: application/json
 
 ###

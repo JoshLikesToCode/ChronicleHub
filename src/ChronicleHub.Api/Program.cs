@@ -16,7 +16,7 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-app.MapGet("/api/ping", () =>
+app.MapGet("/api/ping", () => 
     {
         Console.WriteLine("Pong");
     })
