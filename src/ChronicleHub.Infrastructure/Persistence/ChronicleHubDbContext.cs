@@ -34,8 +34,7 @@ public sealed class ChronicleHubDbContext : DbContext
                 .HasMaxLength(200);
 
             cfg.Property(e => e.PayloadJson)
-                .IsRequired()
-                .HasColumnType("nvarchar(max)");
+                .IsRequired();
 
             cfg.HasIndex(e => new { e.TenantId, e.UserId, e.TimestampUtc });
         });

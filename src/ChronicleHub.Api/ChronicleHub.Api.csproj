@@ -12,6 +12,7 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="8.0.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.0" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
   </ItemGroup>
@@ -19,6 +20,7 @@
   <ItemGroup>
     <ProjectReference Include="..\ChronicleHub.Application\ChronicleHub.Application.csproj" />
     <ProjectReference Include="..\ChronicleHub.Infrastructure\ChronicleHub.Infrastructure.csproj" />
+    <ProjectReference Include="..\ChronicleHub.Domain\ChronicleHub.Domain.csproj" />
   </ItemGroup>
 
 </Project>

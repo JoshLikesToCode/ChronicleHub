@@ -3,17 +3,24 @@ using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+builder.Services
+    .AddControllers()
+    .AddJsonOptions(o =>
+    {
+        o.JsonSerializerOptions.PropertyNamingPolicy = null; // or CamelCase if you prefer
+    });
+
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+
+// Use SQLite for dev
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
+                       ?? "Data Source=chroniclehub.db";
 
 builder.Services.AddDbContext<ChronicleHubDbContext>(options =>
 {
-    options.UseSqlServer(connectionString);
+    options.UseSqlite(connectionString);
 });
-
-// Add services to the container.
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
 
@@ -26,11 +33,9 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-app.MapGet("/api/ping", () => 
-    {
-        Console.WriteLine("Pong");
-    })
-.WithName("ping")
-.WithOpenApi();
+// app.UseAuthentication();
+// app.UseAuthorization();
+
+app.MapControllers();
 
 app.Run();

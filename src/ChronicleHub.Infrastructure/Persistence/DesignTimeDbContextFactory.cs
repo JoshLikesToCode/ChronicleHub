@@ -10,11 +10,9 @@ public sealed class DesignTimeDbContextFactory
     {
         var optionsBuilder = new DbContextOptionsBuilder<ChronicleHubDbContext>();
 
-        // This should match the dev connection string
-        const string connectionString =
-            "Server=localhost;Database=ChronicleHub;Trusted_Connection=True;TrustServerCertificate=True;";
+        const string connectionString = "Data Source=chroniclehub.db";
 
-        optionsBuilder.UseSqlServer(connectionString);
+        optionsBuilder.UseSqlite(connectionString);
 
         return new ChronicleHubDbContext(optionsBuilder.Options);
     }
