@@ -24,6 +24,12 @@ builder.Services.AddDbContext<ChronicleHubDbContext>(options =>
 
 var app = builder.Build();
 
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<ChronicleHubDbContext>();
+    db.Database.Migrate(); // for SQLite, this will create the DB file and tables if needed
+}
+
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
