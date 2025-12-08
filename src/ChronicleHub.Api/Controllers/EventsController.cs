@@ -1,5 +1,6 @@
 using System.Text.Json;
 using ChronicleHub.Api.Contracts.Events;
+using ChronicleHub.Api.ExtensionMethods;
 using ChronicleHub.Domain.Entities;
 using ChronicleHub.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Mvc;
@@ -104,6 +105,53 @@ public class EventsController : ControllerBase
             entity.TimestampUtc,
             payloadDoc.RootElement.Clone(),
             entity.CreatedAtUtc
+        );
+
+        return Ok(response);
+    }
+    
+    // GET /api/events/?
+    [HttpGet]
+    public async Task<ActionResult<PagedEventsResponse<EventSummaryResponse>>> GetEvents(
+        [FromQuery] GetEventsRequest request,
+        CancellationToken ct)
+    {
+        var query = _db.Events
+            .AsNoTracking()
+            .AsQueryable()
+            .WhereIf(!string.IsNullOrWhiteSpace(request.Type),
+                e => e.Type == request.Type)
+            .WhereIf(!string.IsNullOrWhiteSpace(request.Source),
+                e => e.Source.Contains(request.Source!))
+            .WhereIf(request.FromUtc.HasValue,
+                e => e.CreatedAtUtc >= request.FromUtc!.Value)
+            .WhereIf(request.ToUtc.HasValue,
+                e => e.CreatedAtUtc <= request.ToUtc!.Value);
+
+        // Count BEFORE paging
+        var total = await query.CountAsync(ct);
+
+        // Paging + projection
+        var items = await query
+            .OrderByDescending(e => e.CreatedAtUtc)
+            .Skip((request.Page - 1) * request.PageSize)
+            .Take(request.PageSize)
+            .Select(e => new EventSummaryResponse(
+                e.Id,
+                e.TenantId,
+                e.UserId,
+                e.Type,
+                e.Source,
+                e.TimestampUtc,
+                e.CreatedAtUtc
+            ))
+            .ToListAsync(ct);
+
+        var response = new PagedEventsResponse<EventSummaryResponse>(
+            items,
+            request.Page,
+            request.PageSize,
+            total
         );
 
         return Ok(response);

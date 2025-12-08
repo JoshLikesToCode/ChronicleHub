@@ -5,7 +5,6 @@ public sealed class ActivityEvent
     public Guid Id { get; private set; }
     public Guid TenantId { get; private set; }
     public Guid UserId { get; private set; }
-
     public string Type { get; private set; } 
     public string Source { get; private set; }
     public DateTime TimestampUtc { get; private set; }
