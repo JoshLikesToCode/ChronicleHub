@@ -116,6 +116,19 @@ public class EventsController : ControllerBase
         [FromQuery] GetEventsRequest request,
         CancellationToken ct)
     {
+        // Validate paging parameters
+        if (request.Page < 1)
+        {
+            ModelState.AddModelError(nameof(request.Page), "Page must be at least 1.");
+            return ValidationProblem(ModelState);
+        }
+
+        if (request.PageSize < 1 || request.PageSize > 100)
+        {
+            ModelState.AddModelError(nameof(request.PageSize), "PageSize must be between 1 and 100.");
+            return ValidationProblem(ModelState);
+        }
+
         var query = _db.Events
             .AsNoTracking()
             .AsQueryable()
@@ -131,9 +144,9 @@ public class EventsController : ControllerBase
         // Count BEFORE paging
         var total = await query.CountAsync(ct);
 
-        // Paging + projection
+        // Apply sorting, paging, and projection
         var items = await query
-            .OrderByDescending(e => e.CreatedAtUtc)
+            .ApplySort(request.SortBy, request.SortDirection)
             .Skip((request.Page - 1) * request.PageSize)
             .Take(request.PageSize)
             .Select(e => new EventSummaryResponse(
