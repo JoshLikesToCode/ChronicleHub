@@ -1,5 +1,7 @@
+using ChronicleHub.Api.Middleware;
 using ChronicleHub.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -11,7 +13,40 @@ builder.Services
     });
 
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(c =>
+{
+    c.SwaggerDoc("v1", new OpenApiInfo
+    {
+        Title = "ChronicleHub API",
+        Version = "v1",
+        Description = "Cloud-native analytics API for user activity events"
+    });
+
+    // Add API Key authentication to Swagger
+    c.AddSecurityDefinition("ApiKey", new OpenApiSecurityScheme
+    {
+        Description = "API Key authentication using X-Api-Key header. Enter your API key below.",
+        Type = SecuritySchemeType.ApiKey,
+        Name = "X-Api-Key",
+        In = ParameterLocation.Header,
+        Scheme = "ApiKeyScheme"
+    });
+
+    c.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        {
+            new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference
+                {
+                    Type = ReferenceType.SecurityScheme,
+                    Id = "ApiKey"
+                }
+            },
+            Array.Empty<string>()
+        }
+    });
+});
 
 // Use SQLite for dev
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
@@ -38,6 +73,9 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+// Custom API Key authentication middleware
+app.UseMiddleware<ApiKeyAuthenticationMiddleware>();
 
 // app.UseAuthentication();
 // app.UseAuthorization();

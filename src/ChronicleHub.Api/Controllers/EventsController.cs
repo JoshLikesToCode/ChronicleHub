@@ -123,7 +123,7 @@ public class EventsController : ControllerBase
             return ValidationProblem(ModelState);
         }
 
-        if (request.PageSize < 1 || request.PageSize > 100)
+        if (request.PageSize is < 1 or > 100)
         {
             ModelState.AddModelError(nameof(request.PageSize), "PageSize must be between 1 and 100.");
             return ValidationProblem(ModelState);
