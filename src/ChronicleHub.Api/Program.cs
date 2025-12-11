@@ -62,7 +62,13 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<ChronicleHubDbContext>();
-    db.Database.Migrate(); // for SQLite, this will create the DB file and tables if needed
+
+    // Only run migrations for relational databases (not in-memory)
+    if (db.Database.GetType().Name != "InMemoryDatabase" &&
+        !db.Database.ProviderName.Contains("InMemory", StringComparison.OrdinalIgnoreCase))
+    {
+        db.Database.Migrate(); // for SQLite, this will create the DB file and tables if needed
+    }
 }
 
 // Configure the HTTP request pipeline.
@@ -74,6 +80,9 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
+// Track request duration for response metadata
+app.UseMiddleware<RequestTimingMiddleware>();
+
 // Custom API Key authentication middleware
 app.UseMiddleware<ApiKeyAuthenticationMiddleware>();
 
@@ -83,3 +92,6 @@ app.UseMiddleware<ApiKeyAuthenticationMiddleware>();
 app.MapControllers();
 
 app.Run();
+
+// Make Program class accessible for integration tests
+public partial class Program { }

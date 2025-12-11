@@ -1,6 +1,8 @@
 using System.Text.Json;
+using ChronicleHub.Api.Contracts.Common;
 using ChronicleHub.Api.Contracts.Events;
 using ChronicleHub.Api.ExtensionMethods;
+using ChronicleHub.Api.Middleware;
 using ChronicleHub.Domain.Entities;
 using ChronicleHub.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Mvc;
@@ -81,22 +83,34 @@ public class EventsController : ControllerBase
 
     // GET /api/events/{id}
     [HttpGet("{id:guid}")]
-    [ProducesResponseType(typeof(EventResponse), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiResponse<EventResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<EventResponse>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetById(Guid id, CancellationToken ct)
     {
         var entity = await _db.Events
             .AsNoTracking()
             .FirstOrDefaultAsync(e => e.Id == id, ct);
 
+        var metadata = new ApiMetadata(
+            RequestDurationMs: HttpContext.GetRequestDurationMs(),
+            TimestampUtc: DateTime.UtcNow
+        );
+
         if (entity is null)
         {
-            return NotFound();
+            var error = new ApiError(
+                Code: "EVENT_NOT_FOUND",
+                Message: $"Event with ID '{id}' was not found.",
+                Details: null
+            );
+
+            var errorResponse = ApiResponse<EventResponse>.ErrorResult(error, metadata);
+            return NotFound(errorResponse);
         }
 
         var payloadDoc = JsonDocument.Parse(entity.PayloadJson);
 
-        var response = new EventResponse(
+        var data = new EventResponse(
             entity.Id,
             entity.TenantId,
             entity.UserId,
@@ -107,7 +121,8 @@ public class EventsController : ControllerBase
             entity.CreatedAtUtc
         );
 
-        return Ok(response);
+        var successResponse = ApiResponse<EventResponse>.SuccessResult(data, metadata);
+        return Ok(successResponse);
     }
     
     // GET /api/events/?
