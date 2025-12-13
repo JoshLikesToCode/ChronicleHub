@@ -1,5 +1,7 @@
 using ChronicleHub.Api.Middleware;
+using ChronicleHub.Infrastructure.Services;
 using ChronicleHub.Infrastructure.Persistence;
+using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
 
@@ -11,6 +13,12 @@ builder.Services
     {
         o.JsonSerializerOptions.PropertyNamingPolicy = null; // or CamelCase if you prefer
     });
+
+// Add FluentValidation
+builder.Services.AddValidatorsFromAssemblyContaining<Program>();
+
+// Add application services
+builder.Services.AddScoped<IStatisticsService, StatisticsService>();
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>

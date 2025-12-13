@@ -3,8 +3,11 @@ using ChronicleHub.Api.Contracts.Common;
 using ChronicleHub.Api.Contracts.Events;
 using ChronicleHub.Api.ExtensionMethods;
 using ChronicleHub.Api.Middleware;
+using ChronicleHub.Api.Validators;
+using ChronicleHub.Infrastructure.Services;
 using ChronicleHub.Domain.Entities;
 using ChronicleHub.Infrastructure.Persistence;
+using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -16,11 +19,19 @@ public class EventsController : ControllerBase
 {
     private readonly ChronicleHubDbContext _db;
     private readonly ILogger<EventsController> _logger;
+    private readonly IValidator<CreateEventRequest> _createEventValidator;
+    private readonly IStatisticsService _statisticsService;
 
-    public EventsController(ChronicleHubDbContext db, ILogger<EventsController> logger)
+    public EventsController(
+        ChronicleHubDbContext db,
+        ILogger<EventsController> logger,
+        IValidator<CreateEventRequest> createEventValidator,
+        IStatisticsService statisticsService)
     {
         _db = db;
         _logger = logger;
+        _createEventValidator = createEventValidator;
+        _statisticsService = statisticsService;
     }
 
     // POST /api/events
@@ -31,21 +42,23 @@ public class EventsController : ControllerBase
         [FromBody] CreateEventRequest request,
         CancellationToken ct)
     {
+        var receivedAtUtc = DateTime.UtcNow;
+        var startTime = HttpContext.Items["RequestStartTime"] as DateTime?;
+
+        // Validate request using FluentValidation
+        var validationResult = await _createEventValidator.ValidateAsync(request, ct);
+        if (!validationResult.IsValid)
+        {
+            foreach (var error in validationResult.Errors)
+            {
+                ModelState.AddModelError(error.PropertyName, error.ErrorMessage);
+            }
+            return ValidationProblem(ModelState);
+        }
+
         // TODO: replace with real tenant/user from auth later
         var tenantId = Guid.Empty;
         var userId = Guid.Empty;
-
-        if (string.IsNullOrWhiteSpace(request.Type))
-        {
-            ModelState.AddModelError(nameof(request.Type), "Type is required.");
-            return ValidationProblem(ModelState);
-        }
-
-        if (string.IsNullOrWhiteSpace(request.Source))
-        {
-            ModelState.AddModelError(nameof(request.Source), "Source is required.");
-            return ValidationProblem(ModelState);
-        }
 
         var payloadJson = request.Payload.GetRawText();
 
@@ -62,7 +75,17 @@ public class EventsController : ControllerBase
         _db.Events.Add(entity);
         await _db.SaveChangesAsync(ct);
 
+        // Update statistics asynchronously
+        await _statisticsService.UpdateStatisticsAsync(entity, ct);
+
         var payloadDoc = JsonDocument.Parse(entity.PayloadJson);
+
+        // Calculate processing duration if start time is available
+        double? processingDurationMs = null;
+        if (startTime.HasValue)
+        {
+            processingDurationMs = (DateTime.UtcNow - startTime.Value).TotalMilliseconds;
+        }
 
         var response = new EventResponse(
             entity.Id,
@@ -72,7 +95,9 @@ public class EventsController : ControllerBase
             entity.Source,
             entity.TimestampUtc,
             payloadDoc.RootElement.Clone(),
-            entity.CreatedAtUtc
+            entity.CreatedAtUtc,
+            receivedAtUtc,
+            processingDurationMs
         );
 
         return CreatedAtAction(
@@ -118,7 +143,9 @@ public class EventsController : ControllerBase
             entity.Source,
             entity.TimestampUtc,
             payloadDoc.RootElement.Clone(),
-            entity.CreatedAtUtc
+            entity.CreatedAtUtc,
+            entity.CreatedAtUtc, // ReceivedAtUtc is same as CreatedAtUtc for existing events
+            metadata.RequestDurationMs // Use request duration as processing duration
         );
 
         var successResponse = ApiResponse<EventResponse>.SuccessResult(data, metadata);

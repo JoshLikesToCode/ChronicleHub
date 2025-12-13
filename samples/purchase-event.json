@@ -1,0 +1,21 @@
+{
+  "Type": "purchase",
+  "Source": "MobileApp",
+  "TimestampUtc": "2025-12-13T14:45:30Z",
+  "Payload": {
+    "orderId": "ORD-2025-12345",
+    "userId": "user-67890",
+    "items": [
+      {
+        "productId": "PROD-001",
+        "productName": "Premium Subscription",
+        "quantity": 1,
+        "price": 29.99
+      }
+    ],
+    "totalAmount": 29.99,
+    "currency": "USD",
+    "paymentMethod": "credit_card",
+    "promotionCode": "WINTER2025"
+  }
+}

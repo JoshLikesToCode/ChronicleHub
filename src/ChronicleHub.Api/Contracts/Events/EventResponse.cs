@@ -10,5 +10,7 @@ public sealed record EventResponse(
     string Source,
     DateTime TimestampUtc,
     JsonElement Payload,
-    DateTime CreatedAtUtc
+    DateTime CreatedAtUtc,
+    DateTime ReceivedAtUtc,
+    double? ProcessingDurationMs = null
 );

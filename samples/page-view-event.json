@@ -1,0 +1,21 @@
+{
+  "Type": "page_view",
+  "Source": "WebApp",
+  "TimestampUtc": "2025-12-13T16:20:15Z",
+  "Payload": {
+    "userId": "user-12345",
+    "sessionId": "session-abc-123",
+    "pageUrl": "/products/analytics-dashboard",
+    "pageTitle": "Analytics Dashboard - ChronicleHub",
+    "referrer": "https://google.com/search",
+    "viewDuration": 45.7,
+    "scrollDepth": 85,
+    "interactions": [
+      {
+        "type": "click",
+        "element": "cta-button",
+        "timestamp": "2025-12-13T16:20:35Z"
+      }
+    ]
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "Type": "user_login",
+  "Source": "WebApp",
+  "TimestampUtc": "2025-12-13T10:30:00Z",
+  "Payload": {
+    "userId": "user-12345",
+    "loginMethod": "email",
+    "ipAddress": "192.168.1.100",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+    "deviceType": "desktop",
+    "location": {
+      "city": "San Francisco",
+      "country": "US"
+    }
+  }
+}
