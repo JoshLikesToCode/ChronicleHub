@@ -11,6 +11,7 @@ ChronicleHub is a production-ready .NET 8 API that ingests activity events from 
 - **Multi-Tenant Ready** - Built-in tenant and user isolation (authentication pending)
 - **API Key Authentication** - Secure endpoints with configurable API keys
 - **Request Validation** - FluentValidation with comprehensive error handling
+- **RFC 9457 Problem Details** - Standardized error responses compliant with IETF specification
 - **Response Metadata** - Automatic timing and processing metrics
 - **Swagger Documentation** - Interactive API explorer in development mode
 - **Docker Support** - Containerized deployment ready for cloud platforms
@@ -230,19 +231,70 @@ Using **FluentValidation** instead of Data Annotations:
 - **RESTful** - Standard HTTP methods and status codes
 - **Consistent Responses** - All responses wrapped in `ApiResponse<T>` with metadata
 - **Request Timing** - Middleware tracks processing duration automatically
-- **Error Handling** - Structured error responses with codes and details
+- **RFC 9457 Error Handling** - Standardized Problem Details for all error responses
+
+#### Error Responses (RFC 9457 Problem Details)
+
+All errors return `application/problem+json` responses following the IETF RFC 9457 specification:
+
+**Example 404 Not Found:**
+```json
+{
+  "type": "https://httpstatuses.io/404",
+  "title": "Not Found",
+  "status": 404,
+  "detail": "ActivityEvent with key 'abc-123' was not found.",
+  "instance": "/api/events/abc-123",
+  "resourceName": "ActivityEvent",
+  "resourceKey": "abc-123"
+}
+```
+
+**Example 400 Validation Error:**
+```json
+{
+  "type": "https://httpstatuses.io/400",
+  "title": "Validation Failed",
+  "status": 400,
+  "detail": "One or more validation errors occurred.",
+  "instance": "/api/events",
+  "errors": {
+    "Type": ["Type is required"],
+    "TimestampUtc": ["Timestamp cannot be in the future"]
+  }
+}
+```
+
+**Available Domain Exceptions:**
+- `NotFoundException` → 404 Not Found
+- `ValidationException` → 400 Bad Request
+- `ConflictException` → 409 Conflict
+- `UnauthorizedException` → 401 Unauthorized
+- `ForbiddenException` → 403 Forbidden
+
+**Environment-Specific Behavior:**
+- **Development**: Includes stack traces and exception details in 500 errors
+- **Production**: Shows generic error messages for 500 errors to prevent information leakage
 
 ## Project Structure
 
 ```
 ChronicleHub/
 ├── src/
-│   ├── ChronicleHub.Domain/         # Core entities and domain logic
-│   ├── ChronicleHub.Application/    # Application services and interfaces
+│   ├── ChronicleHub.Domain/
+│   │   ├── Entities/                # ActivityEvent, DailyStats, CategoryStats
+│   │   └── Exceptions/              # Domain exceptions (NotFoundException, etc.)
+│   ├── ChronicleHub.Application/
+│   │   ├── ProblemDetails/          # RFC 9457 implementation
+│   │   └── Services/                # Application service interfaces
 │   ├── ChronicleHub.Infrastructure/ # Data access and external services
-│   └── ChronicleHub.Api/            # Web API, controllers, DTOs
+│   └── ChronicleHub.Api/
+│       ├── Controllers/             # REST API endpoints
+│       ├── Middleware/              # ProblemDetails, timing, auth
+│       └── Contracts/               # Request/response DTOs
 ├── tests/
 │   ├── ChronicleHub.Domain.Tests/
+│   ├── ChronicleHub.Application.Tests/
 │   ├── ChronicleHub.Api.Tests/
 │   └── ChronicleHub.Api.IntegrationTests/
 ├── samples/                         # Sample event JSON files
@@ -264,7 +316,11 @@ dotnet test /p:CollectCoverage=true
 dotnet test tests/ChronicleHub.Api.IntegrationTests/
 ```
 
-**Current Test Coverage:** 78 tests passing (11 domain + 52 API + 15 integration)
+**Current Test Coverage:** 128 tests passing across all layers:
+- Domain: 27 tests (entities + exceptions)
+- Application: 20 tests (ProblemDetails factory)
+- API Unit: 66 tests (middleware, validators, contracts)
+- Integration: 15 tests (end-to-end scenarios)
 
 ## Development
 

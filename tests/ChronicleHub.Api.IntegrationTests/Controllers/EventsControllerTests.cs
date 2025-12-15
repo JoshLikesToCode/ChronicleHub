@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using ChronicleHub.Api.Contracts.Common;
 using ChronicleHub.Api.Contracts.Events;
+using ChronicleHub.Application.ProblemDetails;
 using FluentAssertions;
 
 namespace ChronicleHub.Api.IntegrationTests.Controllers;
@@ -166,7 +167,7 @@ public class EventsControllerTests : IClassFixture<ChronicleHubWebApplicationFac
     }
 
     [Fact]
-    public async Task GetById_WithNonExistentEvent_ShouldReturnNotFoundEnvelope()
+    public async Task GetById_WithNonExistentEvent_ShouldReturnNotFoundProblemDetails()
     {
         // Arrange
         var nonExistentId = Guid.NewGuid();
@@ -176,16 +177,17 @@ public class EventsControllerTests : IClassFixture<ChronicleHubWebApplicationFac
 
         // Assert
         action.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        action.Content.Headers.ContentType?.MediaType.Should().Be("application/problem+json");
 
-        var response = await action.Content.ReadFromJsonAsync<ApiResponse<EventResponse>>();
-        response.Should().NotBeNull();
-        response!.Success.Should().BeFalse();
-        response.Data.Should().BeNull();
-        response.Error.Should().NotBeNull();
-        response.Error!.Code.Should().Be("EVENT_NOT_FOUND");
-        response.Error.Message.Should().Contain(nonExistentId.ToString());
-        response.Metadata.Should().NotBeNull();
-        response.Metadata!.RequestDurationMs.Should().BeGreaterThanOrEqualTo(0);
+        var problemDetails = await action.Content.ReadFromJsonAsync<ProblemDetailsResponse>();
+        problemDetails.Should().NotBeNull();
+        problemDetails!.Status.Should().Be(404);
+        problemDetails.Title.Should().Be("Not Found");
+        problemDetails.Detail.Should().Contain("ActivityEvent");
+        problemDetails.Detail.Should().Contain(nonExistentId.ToString());
+        problemDetails.Instance.Should().Be($"/api/events/{nonExistentId}");
+        problemDetails.Extensions.Should().ContainKey("resourceName");
+        problemDetails.Extensions!["resourceName"].ToString().Should().Be("ActivityEvent");
     }
 
     [Fact]

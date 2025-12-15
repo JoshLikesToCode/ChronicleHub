@@ -39,3 +39,39 @@ Transformed ChronicleHub from a CRUD service into an event-sourced analytics pla
 **Timestamp:** 2025-12-13 20:00:00 UTC
 
 ---
+
+## RFC 9457 Implementation
+
+Implemented RFC 9457 Problem Details for HTTP APIs to provide standardized, spec-compliant error responses across the entire application. Created domain exceptions (NotFoundException, ValidationException, ConflictException, etc.), ProblemDetails factory for generating responses, and global exception handling middleware that automatically converts exceptions to application/problem+json responses. Added comprehensive test coverage with 61 new tests and updated documentation to reflect the new error handling patterns.
+
+**Files Changed:**
+- src/ChronicleHub.Api/Program.cs
+- src/ChronicleHub.Api/Controllers/EventsController.cs
+- src/ChronicleHub.Application/ChronicleHub.Application.csproj
+- tests/ChronicleHub.Api.IntegrationTests/Controllers/EventsControllerTests.cs
+- tests/ChronicleHub.Api.IntegrationTests/ChronicleHub.Api.IntegrationTests.csproj
+- CLAUDE.md
+- README.md
+
+**Files Added:**
+- src/ChronicleHub.Application/ProblemDetails/ProblemDetailsResponse.cs
+- src/ChronicleHub.Application/ProblemDetails/ProblemDetailsFactory.cs
+- src/ChronicleHub.Domain/Exceptions/DomainException.cs
+- src/ChronicleHub.Domain/Exceptions/NotFoundException.cs
+- src/ChronicleHub.Domain/Exceptions/ValidationException.cs
+- src/ChronicleHub.Domain/Exceptions/ConflictException.cs
+- src/ChronicleHub.Domain/Exceptions/UnauthorizedException.cs
+- src/ChronicleHub.Domain/Exceptions/ForbiddenException.cs
+- src/ChronicleHub.Api/Middleware/ProblemDetailsExceptionMiddleware.cs
+- tests/ChronicleHub.Application.Tests/ChronicleHub.Application.Tests.csproj
+- tests/ChronicleHub.Application.Tests/ProblemDetails/ProblemDetailsFactoryTests.cs
+- tests/ChronicleHub.Domain.Tests/Exceptions/NotFoundExceptionTests.cs
+- tests/ChronicleHub.Domain.Tests/Exceptions/ValidationExceptionTests.cs
+- tests/ChronicleHub.Domain.Tests/Exceptions/ConflictExceptionTests.cs
+- tests/ChronicleHub.Domain.Tests/Exceptions/UnauthorizedExceptionTests.cs
+- tests/ChronicleHub.Domain.Tests/Exceptions/ForbiddenExceptionTests.cs
+- tests/ChronicleHub.Api.Tests/Middleware/ProblemDetailsExceptionMiddlewareTests.cs
+
+**Timestamp:** 2025-12-14 19:22:00 UTC
+
+---

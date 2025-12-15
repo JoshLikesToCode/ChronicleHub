@@ -21,6 +21,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ChronicleHub.Api.Tests", "t
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ChronicleHub.Api.IntegrationTests", "tests\ChronicleHub.Api.IntegrationTests\ChronicleHub.Api.IntegrationTests.csproj", "{B8A1563C-F0DC-4DD5-A064-AB91C8AC3F58}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ChronicleHub.Application.Tests", "tests\ChronicleHub.Application.Tests\ChronicleHub.Application.Tests.csproj", "{8352CAE0-5B89-4DA1-B518-BE030EDAD7FE}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -58,6 +60,10 @@ Global
 		{B8A1563C-F0DC-4DD5-A064-AB91C8AC3F58}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{B8A1563C-F0DC-4DD5-A064-AB91C8AC3F58}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{B8A1563C-F0DC-4DD5-A064-AB91C8AC3F58}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8352CAE0-5B89-4DA1-B518-BE030EDAD7FE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8352CAE0-5B89-4DA1-B518-BE030EDAD7FE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8352CAE0-5B89-4DA1-B518-BE030EDAD7FE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8352CAE0-5B89-4DA1-B518-BE030EDAD7FE}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{DEE21511-3959-47D7-A2C4-55F63C7A3E6A} = {09C8CA70-2B1A-4923-A107-467AF489458A}
@@ -67,5 +73,6 @@ Global
 		{3B39E391-5837-48CC-A8B6-1C1A2389EBE4} = {1F34BCB5-00AB-487F-95D7-142BD5F6A56A}
 		{914FCDB2-7C31-4965-A61A-D114A733BC46} = {1F34BCB5-00AB-487F-95D7-142BD5F6A56A}
 		{B8A1563C-F0DC-4DD5-A064-AB91C8AC3F58} = {1F34BCB5-00AB-487F-95D7-142BD5F6A56A}
+		{8352CAE0-5B89-4DA1-B518-BE030EDAD7FE} = {1F34BCB5-00AB-487F-95D7-142BD5F6A56A}
 	EndGlobalSection
 EndGlobal

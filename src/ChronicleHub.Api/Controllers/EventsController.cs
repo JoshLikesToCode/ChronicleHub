@@ -6,6 +6,7 @@ using ChronicleHub.Api.Middleware;
 using ChronicleHub.Api.Validators;
 using ChronicleHub.Infrastructure.Services;
 using ChronicleHub.Domain.Entities;
+using ChronicleHub.Domain.Exceptions;
 using ChronicleHub.Infrastructure.Persistence;
 using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
@@ -116,22 +117,16 @@ public class EventsController : ControllerBase
             .AsNoTracking()
             .FirstOrDefaultAsync(e => e.Id == id, ct);
 
+        if (entity is null)
+        {
+            // Throw domain exception - middleware will convert to Problem Details
+            throw new NotFoundException("ActivityEvent", id);
+        }
+
         var metadata = new ApiMetadata(
             RequestDurationMs: HttpContext.GetRequestDurationMs(),
             TimestampUtc: DateTime.UtcNow
         );
-
-        if (entity is null)
-        {
-            var error = new ApiError(
-                Code: "EVENT_NOT_FOUND",
-                Message: $"Event with ID '{id}' was not found.",
-                Details: null
-            );
-
-            var errorResponse = ApiResponse<EventResponse>.ErrorResult(error, metadata);
-            return NotFound(errorResponse);
-        }
 
         var payloadDoc = JsonDocument.Parse(entity.PayloadJson);
 

@@ -33,6 +33,38 @@ Stats entities (DailyStats, CategoryStats) are defined but not yet implemented i
 - Custom LINQ extension `WhereIf` is used for conditional query filtering (see ExtensionMethods/WhereIf.cs)
 - JSON serialization uses property names as-is (not camelCase)
 
+### Error Handling (RFC 9457 Problem Details)
+The API implements RFC 9457 Problem Details for HTTP APIs for consistent error responses:
+- **Global Middleware**: `ProblemDetailsExceptionMiddleware` catches all exceptions and converts them to Problem Details responses
+- **Content-Type**: All error responses use `application/problem+json`
+- **Domain Exceptions**: Located in `ChronicleHub.Domain/Exceptions/`
+  - `NotFoundException` → 404 Not Found
+  - `ValidationException` → 400 Bad Request (with validation errors)
+  - `ConflictException` → 409 Conflict
+  - `UnauthorizedException` → 401 Unauthorized
+  - `ForbiddenException` → 403 Forbidden
+- **Factory Methods**: Use `ProblemDetailsFactory` in `ChronicleHub.Application/ProblemDetails/` to create responses
+- **Environment-Aware**: Development mode includes stack traces and exception details; Production mode shows generic messages
+- **Extensions**: Problem Details can include custom extension members (e.g., `resourceName`, `resourceKey`, validation `errors`)
+
+To throw a domain exception from a controller:
+```csharp
+throw new NotFoundException("ActivityEvent", id);
+```
+
+The middleware automatically converts this to:
+```json
+{
+  "type": "https://httpstatuses.io/404",
+  "title": "Not Found",
+  "status": 404,
+  "detail": "ActivityEvent with key '...' was not found.",
+  "instance": "/api/events/...",
+  "resourceName": "ActivityEvent",
+  "resourceKey": "..."
+}
+```
+
 ### Entity Framework
 - DbContext: `ChronicleHubDbContext` in Infrastructure layer
 - Migrations are in `Infrastructure/Persistence/Migrations/`

@@ -88,6 +88,9 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
+// Global exception handling - must be first to catch all exceptions
+app.UseMiddleware<ProblemDetailsExceptionMiddleware>();
+
 // Track request duration for response metadata
 app.UseMiddleware<RequestTimingMiddleware>();
 
