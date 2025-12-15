@@ -56,13 +56,22 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
-// Use SQLite for dev
+// Configure database based on connection string
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
                        ?? "Data Source=chroniclehub.db";
 
 builder.Services.AddDbContext<ChronicleHubDbContext>(options =>
 {
-    options.UseSqlite(connectionString);
+    // Use PostgreSQL if connection string contains "Host=" or "Server="
+    if (connectionString.Contains("Host=", StringComparison.OrdinalIgnoreCase) ||
+        connectionString.Contains("Server=", StringComparison.OrdinalIgnoreCase))
+    {
+        options.UseNpgsql(connectionString);
+    }
+    else
+    {
+        options.UseSqlite(connectionString);
+    }
 });
 
 var app = builder.Build();

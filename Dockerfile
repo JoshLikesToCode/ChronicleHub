@@ -8,6 +8,7 @@ COPY src/ChronicleHub.Api/ChronicleHub.Api.csproj src/ChronicleHub.Api/
 COPY src/ChronicleHub.Application/ChronicleHub.Application.csproj src/ChronicleHub.Application/
 COPY src/ChronicleHub.Domain/ChronicleHub.Domain.csproj src/ChronicleHub.Domain/
 COPY src/ChronicleHub.Infrastructure/ChronicleHub.Infrastructure.csproj src/ChronicleHub.Infrastructure/
+COPY tests/ tests/
 
 # Restore dependencies
 RUN dotnet restore

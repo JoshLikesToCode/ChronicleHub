@@ -75,3 +75,20 @@ Implemented RFC 9457 Problem Details for HTTP APIs to provide standardized, spec
 **Timestamp:** 2025-12-14 19:22:00 UTC
 
 ---
+
+## PostgreSQL Integration
+
+Transformed ChronicleHub into a cloud-ready service by adding PostgreSQL support via Docker Compose. Added Npgsql.EntityFrameworkCore.PostgreSQL package, configured environment-based connection string selection (PostgreSQL vs SQLite), and created a migration to convert SQLite TEXT columns to PostgreSQL UUID and TIMESTAMP types. The API now runs with PostgreSQL in containers with automatic migrations on startup, providing a production-realistic database story.
+
+**Files Changed:**
+- src/ChronicleHub.Api/Program.cs
+- src/ChronicleHub.Infrastructure/ChronicleHub.Infrastructure.csproj
+- Dockerfile
+
+**Files Added:**
+- docker-compose.yml
+- src/ChronicleHub.Infrastructure/Persistence/Migrations/20251215204246_PostgresSupport.cs
+
+**Timestamp:** 2025-12-15 21:05:00 UTC
+
+---

@@ -1,0 +1,36 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: chroniclehub-postgres
+    environment:
+      POSTGRES_DB: chroniclehub
+      POSTGRES_USER: chroniclehub
+      POSTGRES_PASSWORD: chroniclehub_dev_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U chroniclehub"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: chroniclehub-api
+    ports:
+      - "8080:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:8080
+      - ConnectionStrings__DefaultConnection=Host=postgres;Database=chroniclehub;Username=chroniclehub;Password=chroniclehub_dev_password
+      - ApiKey__DevKey=demo-api-key-12345
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
