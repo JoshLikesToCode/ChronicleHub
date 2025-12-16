@@ -26,12 +26,23 @@ public class ApiKeyAuthenticationMiddleware
             return;
         }
 
-        // Get the expected API key from configuration
-        var expectedApiKey = _configuration["ApiKey:DevKey"];
+        // Only require API key for write operations (POST, PUT, PATCH, DELETE)
+        var httpMethod = context.Request.Method.ToUpperInvariant();
+        var isWriteOperation = httpMethod is "POST" or "PUT" or "PATCH" or "DELETE";
+
+        if (!isWriteOperation)
+        {
+            // Read operations don't require API key
+            await _next(context);
+            return;
+        }
+
+        // Get the expected API key from configuration (environment variable: ApiKey__Key)
+        var expectedApiKey = _configuration["ApiKey:Key"];
 
         if (string.IsNullOrEmpty(expectedApiKey))
         {
-            _logger.LogWarning("API Key is not configured. Check appsettings.json");
+            _logger.LogWarning("API Key is not configured. Check appsettings.json or set ApiKey__Key environment variable");
             context.Response.StatusCode = StatusCodes.Status500InternalServerError;
             await context.Response.WriteAsJsonAsync(new { error = "API Key configuration is missing" });
             return;
@@ -40,9 +51,9 @@ public class ApiKeyAuthenticationMiddleware
         // Check if the X-Api-Key header is present
         if (!context.Request.Headers.TryGetValue(ApiKeyHeaderName, out var providedApiKey))
         {
-            _logger.LogWarning("API request without API key from {RemoteIp}", context.Connection.RemoteIpAddress);
+            _logger.LogWarning("Write operation without API key from {RemoteIp}", context.Connection.RemoteIpAddress);
             context.Response.StatusCode = StatusCodes.Status401Unauthorized;
-            await context.Response.WriteAsJsonAsync(new { error = "API Key is missing. Include X-Api-Key header." });
+            await context.Response.WriteAsJsonAsync(new { error = "API Key is missing. Include X-Api-Key header for write operations." });
             return;
         }
 

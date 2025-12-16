@@ -25,6 +25,117 @@ ChronicleHub is a production-ready .NET 8 API that ingests activity events from 
 - **Clean Architecture** - Maintainable domain-driven design
 - **Docker** - Container-based deployment
 
+## Configuration
+
+ChronicleHub is designed to be cloud-native and fully configurable via environment variables. No hardcoded values - the same Docker image works in all environments.
+
+### Required Environment Variables
+
+| Variable | Description | Example | Default |
+|----------|-------------|---------|---------|
+| `ConnectionStrings__DefaultConnection` | Database connection string | `Data Source=chroniclehub.db` (SQLite)<br>`Host=localhost;Database=chroniclehub;Username=postgres;Password=secret` (PostgreSQL) | `Data Source=chroniclehub.db` |
+| `ApiKey__Key` | API key for write operations (POST/PUT/PATCH/DELETE) | `your-secret-api-key-here` | *(required - no default)* |
+
+### Optional Environment Variables
+
+| Variable | Description | Example | Default |
+|----------|-------------|---------|---------|
+| `Swagger__Enabled` | Enable/disable Swagger UI | `true` or `false` | `false` (Production), `true` (Development) |
+| `Urls` | HTTP server binding address | `http://0.0.0.0:8080` | `http://0.0.0.0:8080` (Production), `http://localhost:5000` (Development) |
+| `ASPNETCORE_ENVIRONMENT` | Environment name | `Development`, `Staging`, `Production` | `Production` |
+
+### Environment Variable Syntax
+
+.NET Core uses double underscores (`__`) to represent nested JSON configuration keys:
+
+```bash
+# These are equivalent:
+export ApiKey__Key="my-secret-key"
+# vs JSON: { "ApiKey": { "Key": "my-secret-key" } }
+
+export ConnectionStrings__DefaultConnection="Host=db;Database=chronicle"
+# vs JSON: { "ConnectionStrings": { "DefaultConnection": "Host=db;Database=chronicle" } }
+```
+
+### Example: Local Development
+
+```bash
+# Set environment variables
+export ASPNETCORE_ENVIRONMENT=Development
+export ConnectionStrings__DefaultConnection="Data Source=chroniclehub.db"
+export ApiKey__Key="dev-chronicle-hub-key-12345"
+export Swagger__Enabled=true
+export Urls="http://localhost:5000"
+
+# Run the application
+dotnet run --project src/ChronicleHub.Api/ChronicleHub.Api.csproj
+```
+
+### Example: Docker with Environment Variables
+
+```bash
+docker run -p 8080:8080 \
+  -e ConnectionStrings__DefaultConnection="Data Source=/data/chroniclehub.db" \
+  -e ApiKey__Key="prod-secure-key-xyz789" \
+  -e Swagger__Enabled=false \
+  -e Urls="http://0.0.0.0:8080" \
+  -v $(pwd)/data:/data \
+  chroniclehub-api
+```
+
+### Example: Kubernetes ConfigMap + Secret
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: chroniclehub-secrets
+type: Opaque
+stringData:
+  api-key: "prod-secure-key-xyz789"
+  db-connection: "Host=postgres;Database=chroniclehub;Username=app;Password=secret"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: chroniclehub-config
+data:
+  SWAGGER_ENABLED: "false"
+  URLS: "http://0.0.0.0:8080"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: chroniclehub-api
+spec:
+  template:
+    spec:
+      containers:
+      - name: api
+        image: chroniclehub-api:latest
+        env:
+        - name: ApiKey__Key
+          valueFrom:
+            secretKeyRef:
+              name: chroniclehub-secrets
+              key: api-key
+        - name: ConnectionStrings__DefaultConnection
+          valueFrom:
+            secretKeyRef:
+              name: chroniclehub-secrets
+              key: db-connection
+        - name: Swagger__Enabled
+          valueFrom:
+            configMapKeyRef:
+              name: chroniclehub-config
+              key: SWAGGER_ENABLED
+        - name: Urls
+          valueFrom:
+            configMapKeyRef:
+              name: chroniclehub-config
+              key: URLS
+```
+
 ## Quick Start
 
 ### Prerequisites
@@ -68,15 +179,22 @@ docker run -p 8080:8080 chroniclehub-api
 
 ### Authentication
 
-All API endpoints (except Swagger) require an API key via the `X-Api-Key` header.
+**Write operations** (POST, PUT, PATCH, DELETE) require an API key via the `X-Api-Key` header.
+
+**Read operations** (GET) do not require authentication and are publicly accessible.
 
 **Development API Key:** `dev-chronicle-hub-key-12345`
 
-Configure in `appsettings.Development.json`:
+Set via environment variable:
+```bash
+export ApiKey__Key="dev-chronicle-hub-key-12345"
+```
+
+Or configure in `appsettings.Development.json`:
 ```json
 {
   "ApiKey": {
-    "DevKey": "dev-chronicle-hub-key-12345"
+    "Key": "dev-chronicle-hub-key-12345"
   }
 }
 ```
@@ -128,10 +246,9 @@ curl -X POST http://localhost:5000/api/events \
 
 ### Example: Getting Daily Statistics
 
-**Request:**
+**Request:** (no API key required for read operations)
 ```bash
-curl -X GET http://localhost:5000/api/stats/daily/2025-12-13 \
-  -H "X-Api-Key: dev-chronicle-hub-key-12345"
+curl -X GET http://localhost:5000/api/stats/daily/2025-12-13
 ```
 
 **Response:**

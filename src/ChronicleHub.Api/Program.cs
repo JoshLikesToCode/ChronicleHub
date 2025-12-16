@@ -20,41 +20,46 @@ builder.Services.AddValidatorsFromAssemblyContaining<Program>();
 // Add application services
 builder.Services.AddScoped<IStatisticsService, StatisticsService>();
 
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen(c =>
+// Add Swagger based on configuration
+var swaggerEnabled = builder.Configuration.GetValue<bool>("Swagger:Enabled");
+if (swaggerEnabled)
 {
-    c.SwaggerDoc("v1", new OpenApiInfo
+    builder.Services.AddEndpointsApiExplorer();
+    builder.Services.AddSwaggerGen(c =>
     {
-        Title = "ChronicleHub API",
-        Version = "v1",
-        Description = "Cloud-native analytics API for user activity events"
-    });
-
-    // Add API Key authentication to Swagger
-    c.AddSecurityDefinition("ApiKey", new OpenApiSecurityScheme
-    {
-        Description = "API Key authentication using X-Api-Key header. Enter your API key below.",
-        Type = SecuritySchemeType.ApiKey,
-        Name = "X-Api-Key",
-        In = ParameterLocation.Header,
-        Scheme = "ApiKeyScheme"
-    });
-
-    c.AddSecurityRequirement(new OpenApiSecurityRequirement
-    {
+        c.SwaggerDoc("v1", new OpenApiInfo
         {
-            new OpenApiSecurityScheme
+            Title = "ChronicleHub API",
+            Version = "v1",
+            Description = "Cloud-native analytics API for user activity events"
+        });
+
+        // Add API Key authentication to Swagger
+        c.AddSecurityDefinition("ApiKey", new OpenApiSecurityScheme
+        {
+            Description = "API Key authentication using X-Api-Key header. Enter your API key below.",
+            Type = SecuritySchemeType.ApiKey,
+            Name = "X-Api-Key",
+            In = ParameterLocation.Header,
+            Scheme = "ApiKeyScheme"
+        });
+
+        c.AddSecurityRequirement(new OpenApiSecurityRequirement
+        {
             {
-                Reference = new OpenApiReference
+                new OpenApiSecurityScheme
                 {
-                    Type = ReferenceType.SecurityScheme,
-                    Id = "ApiKey"
-                }
-            },
-            Array.Empty<string>()
-        }
+                    Reference = new OpenApiReference
+                    {
+                        Type = ReferenceType.SecurityScheme,
+                        Id = "ApiKey"
+                    }
+                },
+                Array.Empty<string>()
+            }
+        });
     });
-});
+}
 
 // Configure database based on connection string
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
@@ -89,7 +94,8 @@ using (var scope = app.Services.CreateScope())
 }
 
 // Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
+// Use Swagger based on configuration (not just environment)
+if (swaggerEnabled)
 {
     app.UseSwagger();
     app.UseSwaggerUI();

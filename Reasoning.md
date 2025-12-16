@@ -92,3 +92,23 @@ Transformed ChronicleHub into a cloud-ready service by adding PostgreSQL support
 **Timestamp:** 2025-12-15 21:05:00 UTC
 
 ---
+
+## Configuration Strategy
+
+Eliminated all hardcoded configuration values to make ChronicleHub truly cloud-native. All settings (connection strings, API keys, ports, Swagger toggle) are now environment-variable driven, allowing the same Docker image to run in local, kind, and cloud environments without rebuilding. Added Swagger__Enabled configuration for environment-specific UI control. Modified API key authentication to only protect write operations (POST/PUT/PATCH/DELETE) while allowing public read access (GET). Created comprehensive documentation with examples for Docker and Kubernetes deployments, plus a .env.example template for local development.
+
+**Files Changed:**
+- src/ChronicleHub.Api/appsettings.json
+- src/ChronicleHub.Api/appsettings.Development.json
+- src/ChronicleHub.Api/Program.cs
+- src/ChronicleHub.Api/Middleware/ApiKeyAuthenticationMiddleware.cs
+- tests/ChronicleHub.Api.IntegrationTests/Controllers/EventsControllerTests.cs
+- README.md
+- .gitignore
+
+**Files Added:**
+- .env.example
+
+**Timestamp:** 2025-12-16 03:15:00 UTC
+
+---

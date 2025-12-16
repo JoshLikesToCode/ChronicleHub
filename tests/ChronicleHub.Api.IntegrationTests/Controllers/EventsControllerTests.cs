@@ -191,17 +191,18 @@ public class EventsControllerTests : IClassFixture<ChronicleHubWebApplicationFac
     }
 
     [Fact]
-    public async Task GetById_WithoutApiKey_ShouldReturnUnauthorized()
+    public async Task GetById_WithoutApiKey_ShouldAllowReadOperation()
     {
-        // Arrange
+        // Arrange - GET requests don't require API key
         var client = _factory.CreateClient();
         var eventId = Guid.NewGuid();
 
         // Act
         var action = await client.GetAsync($"/api/events/{eventId}");
 
-        // Assert
-        action.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        // Assert - Should return 404 (not found) instead of 401 (unauthorized)
+        // This proves the API key check was skipped for the read operation
+        action.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
     [Fact]

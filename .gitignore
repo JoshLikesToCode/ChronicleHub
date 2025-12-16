@@ -34,8 +34,7 @@ artifacts/
 wwwroot/lib/
 wwwroot/dist/
 
-# Local config overrides
-appsettings.Development.json
+# Local config overrides (keep appsettings.Development.json in git, it has no secrets)
 appsettings.Local.json
 
 # SQLite or local dev DB files
