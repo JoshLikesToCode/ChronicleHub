@@ -1,0 +1,84 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: chroniclehub-api
+  labels:
+    app: chroniclehub-api
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: chroniclehub-api
+  template:
+    metadata:
+      labels:
+        app: chroniclehub-api
+    spec:
+      containers:
+      - name: api
+        image: chroniclehub-api:latest
+        ports:
+        - containerPort: 8080
+          name: http
+        env:
+        - name: ASPNETCORE_ENVIRONMENT
+          value: "Production"
+        - name: ConnectionStrings__DefaultConnection
+          valueFrom:
+            secretKeyRef:
+              name: chroniclehub-secrets
+              key: database-connection-string
+
+        # Liveness probe - checks if the application is running
+        # If this fails, Kubernetes will restart the pod
+        livenessProbe:
+          httpGet:
+            path: /health/live
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+
+        # Readiness probe - checks if the application is ready to serve traffic
+        # If this fails, Kubernetes will stop sending traffic to the pod
+        readinessProbe:
+          httpGet:
+            path: /health/ready
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 2
+
+        # Resource limits for better scheduling
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+
+        # Graceful shutdown configuration
+        lifecycle:
+          preStop:
+            exec:
+              command: ["/bin/sh", "-c", "sleep 5"]
+
+      # Graceful termination period (should be greater than shutdown timeout)
+      terminationGracePeriodSeconds: 40
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: chroniclehub-api
+spec:
+  selector:
+    app: chroniclehub-api
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 8080
+  type: ClusterIP

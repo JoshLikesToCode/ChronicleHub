@@ -112,3 +112,19 @@ Eliminated all hardcoded configuration values to make ChronicleHub truly cloud-n
 **Timestamp:** 2025-12-16 03:15:00 UTC
 
 ---
+
+## Kubernetes-Native Support
+
+Made ChronicleHub fully Kubernetes-native by implementing health check endpoints, graceful shutdown, and container-aware configuration. Added /health/live liveness probe and /health/ready readiness probe with database connectivity testing. Configured 30-second graceful shutdown timeout for safe pod termination. Disabled HTTPS redirection when running in containers to eliminate noise in Kubernetes environments where ingress handles TLS. Excluded health endpoints from API key authentication for proper cluster health monitoring.
+
+**Files Changed:**
+- src/ChronicleHub.Api/Program.cs
+- src/ChronicleHub.Api/Middleware/ApiKeyAuthenticationMiddleware.cs
+
+**Files Added:**
+- src/ChronicleHub.Api/Controllers/HealthController.cs
+- k8s-deployment-example.yaml
+
+**Timestamp:** 2025-12-18 00:48:00 UTC
+
+---

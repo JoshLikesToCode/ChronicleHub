@@ -79,6 +79,12 @@ builder.Services.AddDbContext<ChronicleHubDbContext>(options =>
     }
 });
 
+// Configure graceful shutdown
+builder.Services.Configure<HostOptions>(options =>
+{
+    options.ShutdownTimeout = TimeSpan.FromSeconds(30);
+});
+
 var app = builder.Build();
 
 using (var scope = app.Services.CreateScope())
@@ -87,7 +93,7 @@ using (var scope = app.Services.CreateScope())
 
     // Only run migrations for relational databases (not in-memory)
     if (db.Database.GetType().Name != "InMemoryDatabase" &&
-        !db.Database.ProviderName.Contains("InMemory", StringComparison.OrdinalIgnoreCase))
+        !(db.Database.ProviderName?.Contains("InMemory", StringComparison.OrdinalIgnoreCase) ?? false))
     {
         db.Database.Migrate(); // for SQLite, this will create the DB file and tables if needed
     }
@@ -101,7 +107,13 @@ if (swaggerEnabled)
     app.UseSwaggerUI();
 }
 
-app.UseHttpsRedirection();
+// Only use HTTPS redirection when not in container mode (DOTNET_RUNNING_IN_CONTAINER)
+// This prevents noisy logs in Kubernetes environments
+var isRunningInContainer = Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER") == "true";
+if (!isRunningInContainer && !app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
 
 // Global exception handling - must be first to catch all exceptions
 app.UseMiddleware<ProblemDetailsExceptionMiddleware>();

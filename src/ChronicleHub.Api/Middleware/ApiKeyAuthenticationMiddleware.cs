@@ -19,8 +19,9 @@ public class ApiKeyAuthenticationMiddleware
 
     public async Task InvokeAsync(HttpContext context)
     {
-        // Skip authentication for Swagger endpoints
-        if (context.Request.Path.StartsWithSegments("/swagger"))
+        // Skip authentication for health check and Swagger endpoints
+        if (context.Request.Path.StartsWithSegments("/health") ||
+            context.Request.Path.StartsWithSegments("/swagger"))
         {
             await _next(context);
             return;
