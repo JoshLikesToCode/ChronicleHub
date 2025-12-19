@@ -4,8 +4,34 @@ using ChronicleHub.Infrastructure.Persistence;
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
+using Serilog;
+using Serilog.Formatting.Compact;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 
-var builder = WebApplication.CreateBuilder(args);
+// Configure Serilog before building the host
+Log.Logger = new LoggerConfiguration()
+    .MinimumLevel.Information()
+    .MinimumLevel.Override("Microsoft.AspNetCore", Serilog.Events.LogEventLevel.Warning)
+    .MinimumLevel.Override("Microsoft.EntityFrameworkCore", Serilog.Events.LogEventLevel.Warning)
+    .Enrich.FromLogContext()
+    .Enrich.WithMachineName()
+    .Enrich.WithEnvironmentName()
+    .WriteTo.Console(new CompactJsonFormatter())
+    .CreateBootstrapLogger();
+
+try
+{
+    var builder = WebApplication.CreateBuilder(args);
+
+    // Replace default logging with Serilog
+    builder.Host.UseSerilog((context, services, configuration) => configuration
+        .ReadFrom.Configuration(context.Configuration)
+        .ReadFrom.Services(services)
+        .Enrich.FromLogContext()
+        .Enrich.WithMachineName()
+        .Enrich.WithEnvironmentName()
+        .WriteTo.Console(new CompactJsonFormatter()));
 
 builder.Services
     .AddControllers()
@@ -85,6 +111,32 @@ builder.Services.Configure<HostOptions>(options =>
     options.ShutdownTimeout = TimeSpan.FromSeconds(30);
 });
 
+// Configure OpenTelemetry
+var serviceName = builder.Configuration.GetValue<string>("ServiceName") ?? "ChronicleHub";
+var serviceVersion = typeof(Program).Assembly.GetName().Version?.ToString() ?? "1.0.0";
+
+builder.Services.AddOpenTelemetry()
+    .ConfigureResource(resource => resource
+        .AddService(serviceName: serviceName, serviceVersion: serviceVersion))
+    .WithTracing(tracing => tracing
+        .AddAspNetCoreInstrumentation(options =>
+        {
+            // Enrich traces with additional information
+            options.RecordException = true;
+            options.EnrichWithHttpRequest = (activity, httpRequest) =>
+            {
+                activity.SetTag("http.request.correlation_id",
+                    httpRequest.HttpContext.GetCorrelationId());
+            };
+            options.EnrichWithHttpResponse = (activity, httpResponse) =>
+            {
+                activity.SetTag("http.response.correlation_id",
+                    httpResponse.HttpContext.GetCorrelationId());
+            };
+        })
+        .AddEntityFrameworkCoreInstrumentation()
+        .AddConsoleExporter());
+
 var app = builder.Build();
 
 using (var scope = app.Services.CreateScope())
@@ -115,7 +167,10 @@ if (!isRunningInContainer && !app.Environment.IsDevelopment())
     app.UseHttpsRedirection();
 }
 
-// Global exception handling - must be first to catch all exceptions
+// Correlation ID must be first to ensure all logs have correlation context
+app.UseMiddleware<CorrelationIdMiddleware>();
+
+// Global exception handling - must be early to catch all exceptions
 app.UseMiddleware<ProblemDetailsExceptionMiddleware>();
 
 // Track request duration for response metadata
@@ -127,9 +182,19 @@ app.UseMiddleware<ApiKeyAuthenticationMiddleware>();
 // app.UseAuthentication();
 // app.UseAuthorization();
 
-app.MapControllers();
+    app.MapControllers();
 
-app.Run();
+    Log.Information("Starting ChronicleHub API");
+    app.Run();
+}
+catch (Exception ex)
+{
+    Log.Fatal(ex, "Application terminated unexpectedly");
+}
+finally
+{
+    Log.CloseAndFlush();
+}
 
 // Make Program class accessible for integration tests
 public partial class Program { }

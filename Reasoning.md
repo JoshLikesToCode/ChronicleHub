@@ -128,3 +128,20 @@ Made ChronicleHub fully Kubernetes-native by implementing health check endpoints
 **Timestamp:** 2025-12-18 00:48:00 UTC
 
 ---
+
+## Production Observability
+
+Implemented comprehensive production debugging with Serilog structured JSON logging, correlation ID tracking via X-Correlation-Id header and middleware, and OpenTelemetry instrumentation for ASP.NET Core and Entity Framework Core. All logs now include correlation IDs, trace IDs, and environment context, enabling distributed tracing and efficient troubleshooting in AKS.
+
+**Files Changed:**
+- src/ChronicleHub.Api/ChronicleHub.Api.csproj
+- src/ChronicleHub.Api/Program.cs
+- src/ChronicleHub.Api/appsettings.json
+- src/ChronicleHub.Api/appsettings.Development.json
+
+**Files Added:**
+- src/ChronicleHub.Api/Middleware/CorrelationIdMiddleware.cs
+
+**Timestamp:** 2025-12-19 02:21:00 UTC
+
+---
