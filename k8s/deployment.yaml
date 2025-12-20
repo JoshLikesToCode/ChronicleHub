@@ -1,0 +1,83 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: chroniclehub-api
+  labels:
+    app: chroniclehub
+    component: api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: chroniclehub
+      component: api
+  template:
+    metadata:
+      labels:
+        app: chroniclehub
+        component: api
+    spec:
+      containers:
+      - name: api
+        image: chroniclehub-api:latest
+        imagePullPolicy: Never  # Use local image for minikube
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        volumeMounts:
+        - name: data
+          mountPath: /app/data
+        env:
+        - name: ASPNETCORE_ENVIRONMENT
+          value: "Development"
+        - name: ASPNETCORE_URLS
+          value: "http://+:8080"
+        - name: Urls
+          value: "http://+:8080"
+        - name: ConnectionStrings__DefaultConnection
+          valueFrom:
+            configMapKeyRef:
+              name: chroniclehub-config
+              key: connection-string
+        - name: ApiKey__Key
+          valueFrom:
+            secretKeyRef:
+              name: chroniclehub-secret
+              key: api-key
+        - name: Swagger__Enabled
+          valueFrom:
+            configMapKeyRef:
+              name: chroniclehub-config
+              key: swagger-enabled
+        - name: ServiceName
+          valueFrom:
+            configMapKeyRef:
+              name: chroniclehub-config
+              key: service-name
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        livenessProbe:
+          httpGet:
+            path: /health/live
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health/ready
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+      volumes:
+      - name: data
+        emptyDir: {}

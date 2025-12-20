@@ -105,6 +105,41 @@ docker build -t chroniclehub-api .
 docker run -p 8080:8080 chroniclehub-api
 ```
 
+### Kubernetes (Minikube)
+```bash
+# Start minikube with Docker driver
+minikube start --driver=docker
+
+# Build image inside minikube's Docker daemon
+minikube image build -t chroniclehub-api:latest .
+
+# Deploy all Kubernetes resources
+kubectl apply -f k8s/
+
+# Check deployment status
+kubectl get pods
+kubectl get all
+
+# View logs
+kubectl logs -l app=chroniclehub --tail=50 -f
+
+# Get service URL (keeps tunnel open)
+minikube service chroniclehub-api --url
+
+# Alternative: Port-forward
+kubectl port-forward service/chroniclehub-api 8080:8080
+
+# Rebuild after code changes
+minikube image build -t chroniclehub-api:latest .
+kubectl rollout restart deployment/chroniclehub-api
+kubectl rollout status deployment/chroniclehub-api
+
+# Cleanup
+kubectl delete -f k8s/
+minikube stop
+minikube delete  # Optional: removes everything
+```
+
 ### API Testing
 - Swagger UI available at `/swagger` when running in Development mode
 - API endpoints are at `/api/[controller]`

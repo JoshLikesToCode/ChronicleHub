@@ -145,3 +145,19 @@ Implemented comprehensive production debugging with Serilog structured JSON logg
 **Timestamp:** 2025-12-19 02:21:00 UTC
 
 ---
+
+## Local Kubernetes Deployment
+
+Created complete Kubernetes manifests and deployed ChronicleHub to a local minikube cluster, establishing the bridge to managed Kubernetes environments. Built k8s/ directory with production-ready configurations including deployment (2 replicas with resource limits, health probes, and emptyDir volumes for SQLite), NodePort service for local access, ConfigMap for non-sensitive configuration, and Secret for API keys. Fixed container networking issues by ensuring the app binds to 0.0.0.0:8080 instead of localhost:5000. Successfully deployed to minikube, verified health checks passing, accessed Swagger UI, and validated API functionality with successful POST requests returning HTTP 201.
+
+**Reasoning:** Running on Kubernetes locally provides a production-realistic environment for testing container orchestration, health checks, configuration management, and multi-replica deployments before deploying to managed clusters like AKS or GKE.
+
+**Files Added:**
+- k8s/deployment.yaml
+- k8s/service.yaml
+- k8s/configmap.yaml
+- k8s/secret.yaml
+
+**Timestamp:** 2025-12-20 01:55:00 UTC
+
+---
