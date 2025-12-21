@@ -1,6 +1,8 @@
 # Kubernetes Manifests for ChronicleHub
 
-This directory contains Kubernetes manifests for deploying ChronicleHub to a local cluster (minikube) or managed Kubernetes services.
+This directory contains raw Kubernetes manifests for deploying ChronicleHub to a local cluster (minikube) or managed Kubernetes services.
+
+> **Recommended Alternative:** For easier deployment with production-ready defaults, use our [Helm chart](../helm/chroniclehub/). Helm provides one-command deployment, easier configuration management, and version control. See the [Helm Deployment Guide](../docs/deployment/helm.md) for details.
 
 ## Files
 

@@ -161,3 +161,31 @@ Created complete Kubernetes manifests and deployed ChronicleHub to a local minik
 **Timestamp:** 2025-12-20 01:55:00 UTC
 
 ---
+
+## Helm Chart
+
+Created production-ready Helm chart for one-command cloud deployment of ChronicleHub. Built complete helm/chroniclehub/ directory with Chart.yaml, values.yaml with configurable parameters (image, env, replicas, resources), and templates for Deployment, Service, PersistentVolumeClaim, ServiceAccount, and Ingress. Fixed configuration issues by setting ASPNETCORE_ENVIRONMENT to Production (avoiding localhost:5000 binding from Development config) and correcting health probe paths to /health/live and /health/ready. Successfully deployed to minikube with health checks passing and database connectivity verified. Updated all documentation (README.md, CLAUDE.md, docs/deployment/helm.md, docs/deployment/kubernetes.md, k8s/README.md) to recommend Helm as the preferred deployment method.
+
+**Reasoning:** Helm provides professional-grade package management with centralized configuration, version control, easy rollbacks, and production-ready defaults. This elevates ChronicleHub from "can run on Kubernetes" to "cloud-deployable with one command" - the standard for modern cloud-native applications.
+
+**Files Changed:**
+- helm/chroniclehub/values.yaml
+- README.md
+- CLAUDE.md
+- docs/deployment/kubernetes.md
+- k8s/README.md
+
+**Files Added:**
+- helm/chroniclehub/Chart.yaml
+- helm/chroniclehub/values.yaml
+- helm/chroniclehub/templates/_helpers.tpl
+- helm/chroniclehub/templates/deployment.yaml
+- helm/chroniclehub/templates/service.yaml
+- helm/chroniclehub/templates/ingress.yaml
+- helm/chroniclehub/templates/pvc.yaml
+- helm/chroniclehub/templates/serviceaccount.yaml
+- docs/deployment/helm.md
+
+**Timestamp:** 2025-12-21 00:21:47 UTC
+
+---

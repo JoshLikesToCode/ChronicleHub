@@ -1,6 +1,8 @@
 # Kubernetes Deployment Guide
 
-This guide covers deploying ChronicleHub to Kubernetes clusters, from local development with minikube to production managed Kubernetes services.
+This guide covers deploying ChronicleHub to Kubernetes clusters using raw manifests, from local development with minikube to production managed Kubernetes services.
+
+> **Recommended:** For production deployments, consider using our [Helm chart](helm.md) which provides one-command deployment with production-ready defaults, easier configuration management, and version control.
 
 ## Prerequisites
 

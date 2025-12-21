@@ -16,6 +16,7 @@ ChronicleHub is an event-sourced analytics API that ingests user activity events
 - **API Key Authentication** - Secure write operations, public read access
 - **FluentValidation** - Strongly-typed request validation with detailed error messages
 - **Docker & Kubernetes** - Containerized deployment with production-ready manifests
+- **Helm Chart** - One-command cloud deployment with production defaults
 
 ## 🚀 Quick Start
 
@@ -41,7 +42,20 @@ docker run -p 8080:8080 chroniclehub-api
 
 **Access at:** http://localhost:8080/swagger
 
-### Run on Kubernetes (Minikube)
+### Run on Kubernetes with Helm (Minikube) - RECOMMENDED
+
+```bash
+minikube start --driver=docker
+minikube image build -t chroniclehub-api:latest .
+helm install chroniclehub ./helm/chroniclehub
+kubectl port-forward svc/chroniclehub 8080:8080
+```
+
+**Access at:** http://localhost:8080/health/ready
+
+One-command deployment with production-ready defaults, health checks, and persistence. See [Helm Deployment Guide](docs/deployment/helm.md) for details.
+
+### Run on Kubernetes (Raw Manifests)
 
 ```bash
 minikube start --driver=docker
@@ -147,7 +161,7 @@ See [Architecture Overview](docs/architecture/overview.md) for details.
 | **Logging** | Serilog | Structured JSON logging |
 | **Tracing** | OpenTelemetry | Distributed tracing, APM-ready |
 | **Containers** | Docker | Multi-stage builds, non-root user |
-| **Orchestration** | Kubernetes | Production-grade deployment |
+| **Orchestration** | Kubernetes + Helm | Production-grade deployment, package manager |
 
 ## 📚 Documentation
 
@@ -160,6 +174,7 @@ See [Architecture Overview](docs/architecture/overview.md) for details.
 | [Authentication](docs/api/authentication.md) | API key setup and security |
 | **Deployment** | |
 | [Docker Deployment](docs/deployment/docker.md) | Container deployment guide |
+| [Helm Deployment](docs/deployment/helm.md) | Production-ready Helm chart (recommended) |
 | [Kubernetes Deployment](docs/deployment/kubernetes.md) | K8s manifests and best practices |
 | **Architecture** | |
 | [Architecture Overview](docs/architecture/overview.md) | System design and patterns |
@@ -252,7 +267,8 @@ ChronicleHub/
 │   └── ChronicleHub.Api/             # Controllers, middleware
 ├── tests/                            # 128 unit + integration tests
 ├── docs/                             # Comprehensive documentation
-├── k8s/                              # Kubernetes manifests
+├── helm/                             # Helm chart for production deployment
+├── k8s/                              # Raw Kubernetes manifests
 └── samples/                          # Example event JSON files
 ```
 

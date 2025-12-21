@@ -140,6 +140,76 @@ minikube stop
 minikube delete  # Optional: removes everything
 ```
 
+### Helm Deployment (Minikube) - RECOMMENDED
+Helm provides a streamlined, production-ready deployment with one command:
+
+```bash
+# Prerequisites: Install Helm (if not already installed)
+# Visit https://helm.sh/docs/intro/install/ or use your package manager
+
+# Start minikube with Docker driver
+minikube start --driver=docker
+
+# Build image inside minikube's Docker daemon
+minikube image build -t chroniclehub-api:latest .
+
+# Install ChronicleHub with Helm (one command deployment!)
+helm install chroniclehub ./helm/chroniclehub
+
+# Check deployment status
+kubectl get all -l app.kubernetes.io/name=chroniclehub
+kubectl get pods -l app.kubernetes.io/name=chroniclehub
+
+# View logs
+kubectl logs -l app.kubernetes.io/name=chroniclehub --tail=50 -f
+
+# Test the API (port-forward to access locally)
+kubectl port-forward svc/chroniclehub 8080:8080
+
+# Test health endpoint
+curl http://localhost:8080/health/ready
+
+# Upgrade after code changes
+minikube image build -t chroniclehub-api:latest .
+helm upgrade chroniclehub ./helm/chroniclehub
+
+# Check upgrade status
+kubectl rollout status deployment/chroniclehub
+
+# Uninstall
+helm uninstall chroniclehub
+
+# Cleanup minikube
+minikube stop
+minikube delete  # Optional: removes everything
+```
+
+**Helm Chart Features:**
+- Production-ready defaults (Production environment, proper health checks)
+- SQLite persistence with PVC (1Gi storage)
+- Configurable replicas, resources, and environment variables
+- Liveness probe at `/health/live`
+- Readiness probe at `/health/ready` (checks DB connectivity)
+- Service Account creation
+- Ingress support (disabled by default, can be enabled in values.yaml)
+
+**Customizing the Deployment:**
+Edit `helm/chroniclehub/values.yaml` to customize:
+- Replica count
+- Resource limits/requests
+- Environment variables
+- Persistence settings
+- Health check intervals
+- Ingress configuration
+
+Or override values via command line:
+```bash
+helm install chroniclehub ./helm/chroniclehub \
+  --set replicaCount=3 \
+  --set resources.limits.memory=1Gi \
+  --set ingress.enabled=true
+```
+
 ### API Testing
 - Swagger UI available at `/swagger` when running in Development mode
 - API endpoints are at `/api/[controller]`

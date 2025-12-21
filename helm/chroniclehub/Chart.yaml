@@ -1,0 +1,15 @@
+apiVersion: v2
+name: chroniclehub
+description: A Helm chart for ChronicleHub - Cloud-native .NET 8 analytics API
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+keywords:
+  - analytics
+  - dotnet
+  - api
+maintainers:
+  - name: ChronicleHub Team
+home: https://github.com/yourusername/chroniclehub
+sources:
+  - https://github.com/yourusername/chroniclehub
