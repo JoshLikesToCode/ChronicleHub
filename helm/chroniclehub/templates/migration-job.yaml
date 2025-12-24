@@ -1,0 +1,73 @@
+{{- if .Values.database.migrations.job.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "chroniclehub.fullname" . }}-migration
+  labels:
+    {{- include "chroniclehub.labels" . | nindent 4 }}
+    app.kubernetes.io/component: migration
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": before-hook-creation
+spec:
+  backoffLimit: {{ .Values.database.migrations.job.backoffLimit }}
+  template:
+    metadata:
+      name: {{ include "chroniclehub.fullname" . }}-migration
+      labels:
+        {{- include "chroniclehub.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: migration
+    spec:
+      restartPolicy: Never
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "chroniclehub.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+      - name: migration
+        securityContext:
+          {{- toYaml .Values.securityContext | nindent 12 }}
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        command:
+          - dotnet
+          - ef
+          - database
+          - update
+          - --project
+          - /app/ChronicleHub.Infrastructure.dll
+          - --startup-project
+          - /app/ChronicleHub.Api.dll
+        env:
+        {{- if .Values.database.connectionStringSecretName }}
+          - name: ConnectionStrings__DefaultConnection
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Values.database.connectionStringSecretName }}
+                key: {{ .Values.database.connectionStringSecretKey | default "connectionString" }}
+        {{- else }}
+          - name: ConnectionStrings__DefaultConnection
+            value: {{ .Values.database.connectionString | quote }}
+        {{- end }}
+          - name: Database__RunMigrationsOnStartup
+            value: "false"
+          - name: ASPNETCORE_ENVIRONMENT
+            value: {{ .Values.database.migrations.job.environment | default "Production" | quote }}
+        resources:
+          {{- toYaml .Values.database.migrations.job.resources | nindent 12 }}
+        {{- if .Values.persistence.enabled }}
+        volumeMounts:
+          - name: data
+            mountPath: {{ .Values.persistence.mountPath }}
+        {{- end }}
+      {{- if .Values.persistence.enabled }}
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: {{ include "chroniclehub.fullname" . }}-pvc
+      {{- end }}
+{{- end }}

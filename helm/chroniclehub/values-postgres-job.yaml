@@ -1,0 +1,58 @@
+# Production values for PostgreSQL with job-based migration strategy
+# Usage: helm install chroniclehub ./helm/chroniclehub -f ./helm/chroniclehub/values-postgres-job.yaml
+
+replicaCount: 3
+
+image:
+  repository: ghcr.io/joshlikestocode/chroniclehub
+  tag: "latest"
+
+database:
+  provider: postgresql
+
+  # Use a Kubernetes secret for the connection string (recommended)
+  # Create the secret first:
+  # kubectl create secret generic chroniclehub-db-secret \
+  #   --from-literal=connectionString="Host=postgres-service;Database=chroniclehub;Username=chroniclehub;Password=YOUR_PASSWORD;SSL Mode=Require"
+  connectionStringSecretName: "chroniclehub-db-secret"
+  connectionStringSecretKey: "connectionString"
+
+  # OR use inline connection string (not recommended for production)
+  # connectionString: "Host=postgres-service;Database=chroniclehub;Username=chroniclehub;Password=changeme;SSL Mode=Require"
+
+  migrations:
+    runOnStartup: false  # Disabled because we're using job
+
+    initContainer:
+      enabled: false  # Not using init container strategy
+
+    job:
+      enabled: true  # Enable job for migrations (runs as Helm pre-install/pre-upgrade hook)
+      environment: "Production"
+      backoffLimit: 5  # Retry up to 5 times if migration fails
+      resources:
+        limits:
+          cpu: 500m
+          memory: 512Mi
+        requests:
+          cpu: 200m
+          memory: 256Mi
+
+# PostgreSQL doesn't need local persistence
+persistence:
+  enabled: false
+
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+resources:
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+  requests:
+    cpu: 500m
+    memory: 512Mi

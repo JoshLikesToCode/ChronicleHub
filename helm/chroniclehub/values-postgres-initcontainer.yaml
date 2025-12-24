@@ -1,0 +1,71 @@
+# Production values for PostgreSQL with init container migration strategy
+# Usage: helm install chroniclehub ./helm/chroniclehub -f ./helm/chroniclehub/values-postgres-initcontainer.yaml
+
+replicaCount: 3
+
+image:
+  repository: ghcr.io/joshlikestocode/chroniclehub
+  tag: "latest"
+
+# Override default env vars for production PostgreSQL
+env:
+  - name: ASPNETCORE_ENVIRONMENT
+    value: "Production"
+  - name: ASPNETCORE_URLS
+    value: "http://+:8080"
+  # Connection string from secret (preferred) or inline below
+  # When using secret, this will be overridden
+  - name: ConnectionStrings__DefaultConnection
+    value: "Host=postgres-service;Database=chroniclehub;Username=chroniclehub;Password=CHANGE_ME;SSL Mode=Require"
+  # Migrations disabled because init container handles them
+  - name: Database__RunMigrationsOnStartup
+    value: "false"
+
+database:
+  provider: postgresql
+
+  # Use a Kubernetes secret for the connection string (recommended)
+  # Create the secret first:
+  # kubectl create secret generic chroniclehub-db-secret \
+  #   --from-literal=connectionString="Host=postgres-service;Database=chroniclehub;Username=chroniclehub;Password=YOUR_PASSWORD;SSL Mode=Require"
+  connectionStringSecretName: "chroniclehub-db-secret"
+  connectionStringSecretKey: "connectionString"
+
+  # OR use inline connection string (not recommended for production)
+  # connectionString: "Host=postgres-service;Database=chroniclehub;Username=chroniclehub;Password=changeme;SSL Mode=Require"
+
+  migrations:
+    runOnStartup: false  # Disabled because we're using init container
+
+    initContainer:
+      enabled: true  # Enable init container for migrations
+      environment: "Production"
+      resources:
+        limits:
+          cpu: 500m
+          memory: 512Mi
+        requests:
+          cpu: 200m
+          memory: 256Mi
+
+    job:
+      enabled: false  # Not using job strategy
+
+# PostgreSQL doesn't need local persistence
+persistence:
+  enabled: false
+
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+resources:
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+  requests:
+    cpu: 500m
+    memory: 512Mi

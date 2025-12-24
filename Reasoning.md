@@ -204,3 +204,26 @@ Implemented comprehensive GitHub Actions CI/CD pipeline with build automation, t
 **Timestamp:** 2025-12-24 04:49:57 UTC
 
 ---
+## Production-Ready Database Migrations
+
+Implemented bulletproof database migration strategy for Kubernetes/AKS deployments, addressing race condition concerns during scale-out scenarios. Added configurable `Database:RunMigrationsOnStartup` setting (defaults to true for dev, can be disabled for production) to Program.cs. Created Helm migration job template that runs as pre-install/pre-upgrade hook for one-time migration execution. Built three production values files for different deployment scenarios: PostgreSQL with init container strategy, PostgreSQL with job-based migrations, and Azure SQL Server for AKS. Provided comprehensive documentation with migration strategy comparison table, database configuration examples for SQLite/PostgreSQL/SQL Server, production deployment guides, and troubleshooting section. Added 26 tests including 9 configuration unit tests (FluentAssertions, AAA pattern), 3 integration tests for startup behavior, and 14 Helm template validation tests covering all migration strategies and database providers - all passing successfully.
+
+**Files Changed:**
+- src/ChronicleHub.Api/Program.cs
+- helm/chroniclehub/values.yaml
+- CLAUDE.md
+
+**Files Added:**
+- helm/chroniclehub/templates/migration-job.yaml
+- helm/chroniclehub/values-postgres-initcontainer.yaml
+- helm/chroniclehub/values-postgres-job.yaml
+- helm/chroniclehub/values-sqlserver-aks.yaml
+- helm/chroniclehub/README.md
+- tests/ChronicleHub.Api.Tests/Configuration/DatabaseConfigurationTests.cs
+- tests/ChronicleHub.Api.IntegrationTests/Startup/MigrationConfigurationTests.cs
+- tests/helm-template-tests.sh
+
+**Timestamp:** 2025-12-24 21:52:00 UTC
+
+---
+

@@ -86,12 +86,73 @@ env:
   # ASP.NET Core URLs
   - name: ASPNETCORE_URLS
     value: "http://+:8080"
-  # Database connection string (using SQLite by default)
+  # Database connection string (overridden by database.connectionString if set)
   - name: ConnectionStrings__DefaultConnection
     value: "Data Source=/app/data/chroniclehub.db"
+  # Control migrations on startup (overridden if using init container or job)
+  - name: Database__RunMigrationsOnStartup
+    value: "true"
   # OpenTelemetry settings (if needed)
   # - name: OTEL_EXPORTER_OTLP_ENDPOINT
   #   value: "http://otel-collector:4317"
+
+# Database configuration
+database:
+  # Database provider: sqlite, postgresql, sqlserver
+  provider: sqlite
+
+  # Connection string (can be overridden by connectionStringSecretName)
+  # SQLite (default for local/dev)
+  connectionString: "Data Source=/app/data/chroniclehub.db"
+
+  # PostgreSQL examples:
+  # connectionString: "Host=postgres-service;Database=chroniclehub;Username=chroniclehub;Password=changeme;SSL Mode=Require"
+  # connectionString: "Host=mypostgres.postgres.database.azure.com;Database=chroniclehub;Username=adminuser@mypostgres;Password=changeme;SSL Mode=Require"
+
+  # SQL Server examples:
+  # connectionString: "Server=sqlserver-service,1433;Database=chroniclehub;User Id=sa;Password=YourStrong@Passw0rd;TrustServerCertificate=True"
+  # connectionString: "Server=myserver.database.windows.net;Database=chroniclehub;User Id=adminuser;Password=changeme;Encrypt=True"
+
+  # Use a Kubernetes secret for connection string (recommended for production)
+  connectionStringSecretName: ""
+  connectionStringSecretKey: "connectionString"
+
+  # Migration strategy configuration
+  migrations:
+    # Run migrations on app startup (default for dev/demos)
+    # Set to false when using initContainer or job strategies
+    runOnStartup: true
+
+    # Init Container strategy (recommended for most production deployments)
+    # Runs migrations before app containers start, in same pod
+    # Pros: Simple, automatic, no race conditions within a pod
+    # Cons: Runs on every pod creation (but migrations are idempotent)
+    initContainer:
+      enabled: false
+      environment: "Production"
+      resources:
+        limits:
+          cpu: 500m
+          memory: 256Mi
+        requests:
+          cpu: 100m
+          memory: 128Mi
+
+    # Job strategy (best for complex migrations or manual control)
+    # Runs as a separate Helm hook job before install/upgrade
+    # Pros: Runs once, better visibility, can be run manually
+    # Cons: Requires Helm hooks, more complex troubleshooting
+    job:
+      enabled: false
+      environment: "Production"
+      backoffLimit: 3
+      resources:
+        limits:
+          cpu: 500m
+          memory: 256Mi
+        requests:
+          cpu: 100m
+          memory: 128Mi
 
 # Persistent volume for SQLite database
 persistence:

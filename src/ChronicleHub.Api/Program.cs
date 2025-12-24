@@ -139,15 +139,21 @@ builder.Services.AddOpenTelemetry()
 
 var app = builder.Build();
 
-using (var scope = app.Services.CreateScope())
-{
-    var db = scope.ServiceProvider.GetRequiredService<ChronicleHubDbContext>();
+// Run migrations on startup if enabled (default: true for dev, configurable for prod)
+var runMigrations = builder.Configuration.GetValue<bool>("Database:RunMigrationsOnStartup", true);
 
-    // Only run migrations for relational databases (not in-memory)
-    if (db.Database.GetType().Name != "InMemoryDatabase" &&
-        !(db.Database.ProviderName?.Contains("InMemory", StringComparison.OrdinalIgnoreCase) ?? false))
+if (runMigrations)
+{
+    using (var scope = app.Services.CreateScope())
     {
-        db.Database.Migrate(); // for SQLite, this will create the DB file and tables if needed
+        var db = scope.ServiceProvider.GetRequiredService<ChronicleHubDbContext>();
+
+        // Only run migrations for relational databases (not in-memory)
+        if (db.Database.GetType().Name != "InMemoryDatabase" &&
+            !(db.Database.ProviderName?.Contains("InMemory", StringComparison.OrdinalIgnoreCase) ?? false))
+        {
+            db.Database.Migrate(); // for SQLite, this will create the DB file and tables if needed
+        }
     }
 }
 

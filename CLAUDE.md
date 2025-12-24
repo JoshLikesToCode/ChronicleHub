@@ -14,9 +14,41 @@ ChronicleHub is a cloud-native .NET 8 analytics API that ingests user activity e
 ## Architecture
 
 ### Database Strategy
-- **Development**: SQLite (default connection string: `Data Source=chroniclehub.db`)
-- **Production**: SQL Server support included via EF Core migrations
-- Auto-migration runs on application startup (see Program.cs:27-31)
+
+**Supported Databases:**
+- **SQLite**: Default for local development and demos
+- **PostgreSQL**: Recommended for production deployments
+- **SQL Server**: Supported for Azure SQL or on-premise deployments
+
+**Migration Strategies:**
+
+ChronicleHub supports three migration strategies, controlled via configuration:
+
+1. **Startup Migrations** (Default for Development)
+   - Migrations run automatically when the application starts
+   - Enabled by default (`Database:RunMigrationsOnStartup=true`)
+   - **Use for**: Local development, demos, single-instance deployments
+   - **Avoid for**: Production with multiple replicas (race condition risk)
+
+2. **Init Container** (Recommended for Production)
+   - Migrations run in an init container before app containers start
+   - Prevents race conditions within a pod
+   - Enabled via Helm: `database.migrations.initContainer.enabled=true`
+   - **Use for**: Production deployments with auto-scaling
+   - See `helm/chroniclehub/values-postgres-initcontainer.yaml`
+
+3. **Job-Based Migrations** (Best for Complex Migrations)
+   - Migrations run as a separate Kubernetes Job (Helm hook)
+   - Runs once before install/upgrade
+   - Better visibility and manual control
+   - Enabled via Helm: `database.migrations.job.enabled=true`
+   - **Use for**: Production with complex migrations, manual control needed
+   - See `helm/chroniclehub/values-postgres-job.yaml` or `values-sqlserver-aks.yaml`
+
+**Configuration:**
+- Startup migrations: `Database:RunMigrationsOnStartup` (default: true)
+- Connection string: `ConnectionStrings:DefaultConnection` (or Kubernetes secret)
+- See Program.cs:142-158 for migration logic
 
 ### Domain Model
 The core entity is `ActivityEvent`, which stores user activity with:
@@ -186,7 +218,8 @@ minikube delete  # Optional: removes everything
 
 **Helm Chart Features:**
 - Production-ready defaults (Production environment, proper health checks)
-- SQLite persistence with PVC (1Gi storage)
+- Multiple database migration strategies (startup, init container, job)
+- Multi-database support (SQLite, PostgreSQL, SQL Server)
 - Configurable replicas, resources, and environment variables
 - Liveness probe at `/health/live`
 - Readiness probe at `/health/ready` (checks DB connectivity)
@@ -197,6 +230,7 @@ minikube delete  # Optional: removes everything
 Edit `helm/chroniclehub/values.yaml` to customize:
 - Replica count
 - Resource limits/requests
+- Database configuration and migration strategy
 - Environment variables
 - Persistence settings
 - Health check intervals
@@ -209,6 +243,58 @@ helm install chroniclehub ./helm/chroniclehub \
   --set resources.limits.memory=1Gi \
   --set ingress.enabled=true
 ```
+
+### Production Deployment with PostgreSQL/SQL Server
+
+For production deployments on AKS or other cloud platforms, use one of the provided production values files:
+
+**PostgreSQL with Init Container (Recommended):**
+```bash
+# Create database secret first
+kubectl create secret generic chroniclehub-db-secret \
+  --from-literal=connectionString="Host=YOUR_POSTGRES_HOST;Database=chroniclehub;Username=YOUR_USER;Password=YOUR_PASSWORD;SSL Mode=Require"
+
+# Deploy with init container migration strategy
+helm install chroniclehub ./helm/chroniclehub \
+  -f ./helm/chroniclehub/values-postgres-initcontainer.yaml
+```
+
+**PostgreSQL with Job-based Migrations:**
+```bash
+# Create database secret first
+kubectl create secret generic chroniclehub-db-secret \
+  --from-literal=connectionString="Host=YOUR_POSTGRES_HOST;Database=chroniclehub;Username=YOUR_USER;Password=YOUR_PASSWORD;SSL Mode=Require"
+
+# Deploy with job migration strategy (runs as Helm hook)
+helm install chroniclehub ./helm/chroniclehub \
+  -f ./helm/chroniclehub/values-postgres-job.yaml
+```
+
+**Azure SQL Server on AKS:**
+```bash
+# Create database secret first
+kubectl create secret generic chroniclehub-db-secret \
+  --from-literal=connectionString="Server=YOURSERVER.database.windows.net;Database=chroniclehub;User Id=YOUR_USER;Password=YOUR_PASSWORD;Encrypt=True"
+
+# Deploy with job migration strategy
+helm install chroniclehub ./helm/chroniclehub \
+  -f ./helm/chroniclehub/values-sqlserver-aks.yaml
+```
+
+**Migration Strategy Comparison:**
+
+| Strategy | When to Use | Pros | Cons |
+|----------|-------------|------|------|
+| **Startup** (default) | Local dev, demos | Simple, automatic | Race conditions with multiple replicas |
+| **Init Container** | Production, auto-scaling | No race conditions per pod, automatic | Runs on every pod start |
+| **Job** | Production, complex migrations | Runs once, better visibility, manual control | Requires Helm, more complex troubleshooting |
+
+**Configuration Options:**
+- `database.migrations.runOnStartup`: Enable/disable startup migrations (default: true)
+- `database.migrations.initContainer.enabled`: Enable init container strategy (default: false)
+- `database.migrations.job.enabled`: Enable job-based strategy (default: false)
+- `database.connectionStringSecretName`: Use Kubernetes secret for DB credentials (recommended)
+- `database.connectionString`: Inline connection string (not recommended for production)
 
 ### API Testing
 - Swagger UI available at `/swagger` when running in Development mode

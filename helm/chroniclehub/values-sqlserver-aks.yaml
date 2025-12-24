@@ -1,0 +1,72 @@
+# Production values for Azure SQL Server on AKS with job-based migrations
+# Usage: helm install chroniclehub ./helm/chroniclehub -f ./helm/chroniclehub/values-sqlserver-aks.yaml
+
+replicaCount: 3
+
+image:
+  repository: ghcr.io/joshlikestocode/chroniclehub
+  tag: "latest"
+
+database:
+  provider: sqlserver
+
+  # Use a Kubernetes secret for the connection string (REQUIRED for production)
+  # Create the secret first:
+  # kubectl create secret generic chroniclehub-db-secret \
+  #   --from-literal=connectionString="Server=myserver.database.windows.net;Database=chroniclehub;User Id=adminuser;Password=YOUR_PASSWORD;Encrypt=True"
+  connectionStringSecretName: "chroniclehub-db-secret"
+  connectionStringSecretKey: "connectionString"
+
+  migrations:
+    runOnStartup: false  # Disabled for production
+
+    initContainer:
+      enabled: false
+
+    job:
+      enabled: true  # Job-based migrations for AKS production
+      environment: "Production"
+      backoffLimit: 5
+      resources:
+        limits:
+          cpu: 1000m
+          memory: 1Gi
+        requests:
+          cpu: 500m
+          memory: 512Mi
+
+# Azure SQL Server - no local persistence needed
+persistence:
+  enabled: false
+
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 20
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+resources:
+  limits:
+    cpu: 2000m
+    memory: 2Gi
+  requests:
+    cpu: 1000m
+    memory: 1Gi
+
+# Production-grade pod disruption budget
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+# Node affinity for AKS system node pools (optional)
+# nodeSelector:
+#   kubernetes.io/os: linux
+#   agentpool: appnodepool
+
+# Tolerations for dedicated node pools (optional)
+# tolerations:
+#   - key: "app"
+#     operator: "Equal"
+#     value: "chroniclehub"
+#     effect: "NoSchedule"
