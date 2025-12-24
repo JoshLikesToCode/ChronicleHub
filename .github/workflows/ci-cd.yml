@@ -134,6 +134,7 @@ jobs:
           type=raw,value=latest,enable={{is_default_branch}}
 
     - name: Build Docker image
+      id: docker-build
       uses: docker/build-push-action@v6
       with:
         context: .
@@ -144,16 +145,23 @@ jobs:
         cache-from: type=gha
         cache-to: type=gha,mode=max
 
+    - name: Get first image tag for scanning
+      id: image-tag
+      run: |
+        FIRST_TAG=$(echo "${{ steps.meta.outputs.tags }}" | head -n1)
+        echo "tag=$FIRST_TAG" >> $GITHUB_OUTPUT
+        echo "Scanning image: $FIRST_TAG"
+
     - name: Run Trivy security scan
       uses: aquasecurity/trivy-action@0.28.0
       with:
-        image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+        image-ref: ${{ steps.image-tag.outputs.tag }}
         format: 'sarif'
         output: 'trivy-results.sarif'
         severity: 'CRITICAL,HIGH'
 
     - name: Upload Trivy results to GitHub Security
-      uses: github/codeql-action/upload-sarif@v3
+      uses: github/codeql-action/upload-sarif@v4
       if: always()
       with:
         sarif_file: 'trivy-results.sarif'
@@ -161,7 +169,7 @@ jobs:
     - name: Run Trivy scan (table output)
       uses: aquasecurity/trivy-action@0.28.0
       with:
-        image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+        image-ref: ${{ steps.image-tag.outputs.tag }}
         format: 'table'
         severity: 'CRITICAL,HIGH'
 
