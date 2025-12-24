@@ -71,8 +71,8 @@ jobs:
         check_name: 'Test Results'
         comment_mode: off
 
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v4
+    - name: Upload coverage reports to Codecov
+      uses: codecov/codecov-action@v5
       with:
         files: ./TestResults/**/coverage.cobertura.xml
         flags: unittests
