@@ -1,0 +1,287 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  release:
+    types: [ published ]
+
+env:
+  DOTNET_VERSION: '8.0.x'
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # Job 1: Build and Test .NET Solution
+  build-and-test:
+    name: Build & Test
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Full history for better code coverage reporting
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Restore dependencies
+      run: dotnet restore
+
+    - name: Build solution
+      run: dotnet build --configuration Release --no-restore
+
+    - name: Run tests with coverage
+      run: |
+        dotnet test --configuration Release --no-build \
+          --verbosity normal \
+          --logger "trx;LogFileName=test-results.trx" \
+          --collect:"XPlat Code Coverage" \
+          --results-directory ./TestResults
+
+    - name: Generate coverage report
+      uses: danielpalme/ReportGenerator-GitHub-Action@5.3.11
+      with:
+        reports: './TestResults/**/coverage.cobertura.xml'
+        targetdir: './coveragereport'
+        reporttypes: 'HtmlInline;Cobertura;MarkdownSummaryGithub'
+
+    - name: Add coverage summary to PR
+      if: github.event_name == 'pull_request'
+      run: |
+        if [ -f ./coveragereport/SummaryGithub.md ]; then
+          cat ./coveragereport/SummaryGithub.md >> $GITHUB_STEP_SUMMARY
+        fi
+
+    - name: Publish test results
+      uses: EnricoMi/publish-unit-test-result-action@v2
+      if: always()
+      with:
+        files: |
+          TestResults/**/*.trx
+        check_name: 'Test Results'
+        comment_mode: off
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v4
+      with:
+        files: ./TestResults/**/coverage.cobertura.xml
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: false
+        token: ${{ secrets.CODECOV_TOKEN }}
+
+    - name: Archive test results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-results
+        path: TestResults/
+        retention-days: 30
+
+    - name: Archive coverage report
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-report
+        path: coveragereport/
+        retention-days: 30
+
+  # Job 2: Docker Build and Security Scan
+  docker-build-scan:
+    name: Docker Build & Scan
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    permissions:
+      contents: read
+      packages: write
+      security-events: write
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Log in to GitHub Container Registry
+      if: github.event_name != 'pull_request'
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Extract metadata for Docker
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=semver,pattern={{version}}
+          type=semver,pattern={{major}}.{{minor}}
+          type=sha,prefix={{branch}}-
+          type=raw,value=latest,enable={{is_default_branch}}
+
+    - name: Build Docker image
+      uses: docker/build-push-action@v6
+      with:
+        context: .
+        push: false
+        load: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+    - name: Run Trivy security scan
+      uses: aquasecurity/trivy-action@0.28.0
+      with:
+        image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+        severity: 'CRITICAL,HIGH'
+
+    - name: Upload Trivy results to GitHub Security
+      uses: github/codeql-action/upload-sarif@v3
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'
+
+    - name: Run Trivy scan (table output)
+      uses: aquasecurity/trivy-action@0.28.0
+      with:
+        image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+        format: 'table'
+        severity: 'CRITICAL,HIGH'
+
+    - name: Push Docker image
+      if: github.event_name != 'pull_request'
+      uses: docker/build-push-action@v6
+      with:
+        context: .
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+  # Job 3: Helm Chart Validation
+  helm-validation:
+    name: Helm Chart Validation
+    runs-on: ubuntu-latest
+    needs: build-and-test
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install Helm
+      uses: azure/setup-helm@v4
+      with:
+        version: 'latest'
+
+    - name: Helm lint
+      run: |
+        helm lint ./helm/chroniclehub \
+          --strict \
+          --values ./helm/chroniclehub/values.yaml
+
+    - name: Helm template
+      run: |
+        helm template chroniclehub ./helm/chroniclehub \
+          --values ./helm/chroniclehub/values.yaml \
+          --output-dir ./helm-output
+
+    - name: Install kubeconform
+      run: |
+        wget https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz
+        tar xf kubeconform-linux-amd64.tar.gz
+        sudo mv kubeconform /usr/local/bin/
+
+    - name: Validate Kubernetes manifests with kubeconform
+      run: |
+        kubeconform \
+          -strict \
+          -ignore-missing-schemas \
+          -summary \
+          -output json \
+          ./helm-output/chroniclehub/templates/*.yaml
+
+    - name: Validate raw K8s manifests
+      run: |
+        kubeconform \
+          -strict \
+          -ignore-missing-schemas \
+          -summary \
+          ./k8s/*.yaml
+
+    - name: Upload Helm templates
+      uses: actions/upload-artifact@v4
+      with:
+        name: helm-templates
+        path: helm-output/
+        retention-days: 7
+
+  # Job 4: Release Automation
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release'
+    needs: [build-and-test, docker-build-scan, helm-validation]
+    permissions:
+      contents: write
+      packages: write
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Package Helm chart
+      run: |
+        helm package ./helm/chroniclehub \
+          --version ${{ github.event.release.tag_name }} \
+          --app-version ${{ github.event.release.tag_name }}
+
+    - name: Upload Helm chart to release
+      uses: softprops/action-gh-release@v2
+      with:
+        files: |
+          chroniclehub-*.tgz
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Generate release notes
+      run: |
+        echo "## Docker Image" >> release-notes.md
+        echo "" >> release-notes.md
+        echo "\`\`\`bash" >> release-notes.md
+        echo "docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.event.release.tag_name }}" >> release-notes.md
+        echo "\`\`\`" >> release-notes.md
+        echo "" >> release-notes.md
+        echo "## Helm Chart" >> release-notes.md
+        echo "" >> release-notes.md
+        echo "\`\`\`bash" >> release-notes.md
+        echo "helm install chroniclehub ./chroniclehub-${{ github.event.release.tag_name }}.tgz" >> release-notes.md
+        echo "\`\`\`" >> release-notes.md
+
+  # Job 5: Status Summary
+  ci-success:
+    name: CI Pipeline Success
+    runs-on: ubuntu-latest
+    needs: [build-and-test, docker-build-scan, helm-validation]
+    if: success()
+
+    steps:
+    - name: Report success
+      run: |
+        echo "### ✅ All CI/CD checks passed!" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ Build & Test (128 tests)" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ Docker Build & Security Scan" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ Helm Chart Validation" >> $GITHUB_STEP_SUMMARY

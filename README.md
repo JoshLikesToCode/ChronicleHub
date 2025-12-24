@@ -1,5 +1,10 @@
 # ChronicleHub
 
+[![CI/CD Pipeline](https://github.com/JoshLikesToCode/ChronicleHub/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/JoshLikesToCode/ChronicleHub/actions/workflows/ci-cd.yml)
+[![codecov](https://codecov.io/gh/JoshLikesToCode/ChronicleHub/branch/main/graph/badge.svg)](https://codecov.io/gh/JoshLikesToCode/ChronicleHub)
+[![Docker Image](https://ghcr-badge.egpl.dev/joshlikestocode/chroniclehub/latest_tag?trim=major&label=latest)](https://github.com/JoshLikesToCode/ChronicleHub/pkgs/container/chroniclehub)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 > **Production-ready cloud-native analytics platform built with .NET 8 and Clean Architecture**
 
 ChronicleHub is an event-sourced analytics API that ingests user activity events from multiple sources, automatically computes derived statistics, and provides real-time analytics through RESTful endpoints. Designed for scalability, observability, and production deployment on Kubernetes.
@@ -24,7 +29,7 @@ ChronicleHub is an event-sourced analytics API that ingests user activity events
 
 ```bash
 # Clone and run
-git clone https://github.com/yourusername/ChronicleHub.git
+git clone https://github.com/JoshLikesToCode/ChronicleHub.git
 cd ChronicleHub
 dotnet run --project src/ChronicleHub.Api/ChronicleHub.Api.csproj
 ```
@@ -181,6 +186,7 @@ See [Architecture Overview](docs/architecture/overview.md) for details.
 | [Error Handling (RFC 9457)](docs/architecture/error-handling.md) | Standardized error responses |
 | **Development** | |
 | [Development Guide](docs/development.md) | Local development setup |
+| [CI/CD Pipeline](docs/ci-cd.md) | GitHub Actions workflow and automation |
 | [CLAUDE.md](CLAUDE.md) | AI-assisted development guide |
 | [Reasoning.md](Reasoning.md) | Development decision history |
 

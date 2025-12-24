@@ -13,7 +13,7 @@ Guide for developers working on ChronicleHub.
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/ChronicleHub.git
+git clone https://github.com/JoshLikesToCode/ChronicleHub.git
 cd ChronicleHub
 
 # Restore dependencies
