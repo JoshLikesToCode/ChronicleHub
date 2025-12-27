@@ -62,9 +62,11 @@ ChronicleHub follows the Clean Architecture pattern with strict dependency rules
 **Dependencies:** None (pure C#)
 
 **Contains:**
-- Entities: `ActivityEvent`, `DailyStats`, `CategoryStats`
-- Domain Exceptions: `NotFoundException`, `ValidationException`, etc.
-- Value Objects (future)
+- Event Entities: `ActivityEvent`, `DailyStats`, `CategoryStats`
+- Auth Entities: `Tenant`, `UserTenant`, `ApiKey`, `RefreshToken`
+- Identity: `ApplicationUser` (extends IdentityUser)
+- Constants: `Roles`, `AuthPolicies`
+- Domain Exceptions: `NotFoundException`, `ValidationException`, `UnauthorizedException`, `ForbiddenException`, etc.
 
 **Key Principles:**
 - No dependencies on external frameworks
@@ -118,10 +120,14 @@ public class ActivityEvent
 **Dependencies:** Domain, Application, EF Core, Npgsql
 
 **Contains:**
-- `ChronicleHubDbContext` (EF Core)
+- `ChronicleHubDbContext` (EF Core, extends IdentityDbContext)
 - Entity Configurations
 - Database Migrations
-- Service Implementations (`StatisticsService`)
+- Service Implementations:
+  - `StatisticsService` - Event-sourced analytics
+  - `TokenService` - JWT generation and validation
+  - `ApiKeyService` - API key management
+  - `AuthenticationService` - User registration, login, refresh, logout
 
 **Key Principles:**
 - Implements interfaces defined in Application
@@ -135,10 +141,16 @@ public class ActivityEvent
 **Dependencies:** All other layers
 
 **Contains:**
-- Controllers
+- Controllers: `EventsController`, `StatsController`, `AuthController`, `HealthController`
 - Request/Response DTOs (Contracts)
-- Middleware (Auth, Logging, Error Handling)
-- Validators (FluentValidation)
+- Middleware:
+  - `TenantResolutionMiddleware` - Extract tenant context from JWT
+  - `CorrelationIdMiddleware` - Request tracking
+  - `ProblemDetailsExceptionMiddleware` - RFC 9457 error handling
+- Authentication Handlers:
+  - `ApiKeyAuthenticationHandler` - Custom API key authentication
+  - JWT Bearer Handler (built-in ASP.NET Core)
+- Validators (FluentValidation): `RegisterRequestValidator`, `LoginRequestValidator`, `CreateEventRequestValidator`
 - Startup Configuration
 
 **Key Principles:**
@@ -325,15 +337,41 @@ X-Correlation-Id: 1e29f30d-9547-494c-8cf1-7e5cd8f723c8
 
 ### Authentication
 
-- API key for write operations
-- Public read access
-- JWT tokens (future)
+ChronicleHub implements a **dual authentication system**:
+
+- **JWT Bearer Tokens**: User authentication for queries, stats, and admin operations
+  - ASP.NET Core Identity for user management
+  - Access tokens (15 min production, 60 min dev)
+  - Refresh tokens with rotation (7 days production, 30 days dev)
+  - HttpOnly, Secure, SameSite=Strict cookies for refresh tokens
+  - SHA256-hashed tokens stored in database
+
+- **API Keys**: Service-to-service authentication for event ingestion
+  - Tenant-scoped keys with "ch_live_" prefix
+  - SHA256-hashed keys stored in database
+  - Optional expiration dates
+  - Usage tracking (LastUsedAtUtc)
+  - Revocation support
+
+### Multi-Tenancy
+
+- **Database-Level Isolation**: Global query filters automatically enforce tenant boundaries
+- **Tenant Resolution**: Middleware extracts tenant ID from JWT claims and sets DbContext tenant context
+- **User-Tenant Membership**: Users can belong to multiple tenants with different roles (Owner, Admin, Member)
+- **Authorization Policies**:
+  - RequireAuthentication - Valid JWT required
+  - RequireTenantMembership - User must be tenant member
+  - RequireAdminRole - Admin or Owner role required
+  - RequireOwnerRole - Owner role required
+  - ApiKeyOnly - API key authentication required
 
 ### Principle of Least Privilege
 
 - Container runs as non-root user
 - Database user has minimal permissions
 - Read-only filesystem (where possible)
+- Tenant isolation prevents cross-tenant data access
+- Role-based authorization controls feature access
 
 ### Defense in Depth
 

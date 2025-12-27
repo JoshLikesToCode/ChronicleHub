@@ -1,13 +1,18 @@
+using System.Security.Claims;
 using ChronicleHub.Api.Contracts.Common;
 using ChronicleHub.Api.Contracts.Stats;
 using ChronicleHub.Api.Middleware;
+using ChronicleHub.Domain.Constants;
+using ChronicleHub.Domain.Exceptions;
 using ChronicleHub.Infrastructure.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace ChronicleHub.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize(Policy = AuthPolicies.RequireTenantMembership)]
 public class StatsController : ControllerBase
 {
     private readonly IStatisticsService _statisticsService;
@@ -27,8 +32,15 @@ public class StatsController : ControllerBase
         [FromRoute] DateOnly date,
         CancellationToken ct)
     {
-        // TODO: replace with real tenant/user from auth later
-        var tenantId = Guid.Empty;
+        // Extract tenant and user from JWT claims
+        var tenantIdClaim = User.FindFirst("tid")?.Value;
+        if (!Guid.TryParse(tenantIdClaim, out var tenantId))
+        {
+            throw new UnauthorizedException("Tenant ID not found in authentication context");
+        }
+
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        // For stats, we use Guid.Empty to show tenant-wide stats (not user-specific)
         var userId = Guid.Empty;
 
         var (dailyStats, categoryStats) = await _statisticsService.GetDailyStatisticsAsync(

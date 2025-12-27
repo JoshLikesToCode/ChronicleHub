@@ -66,6 +66,8 @@ export ASPNETCORE_ENVIRONMENT=Production
 dotnet run --project src/ChronicleHub.Api/ChronicleHub.Api.csproj
 ```
 
+**Note on Authentication:** The development configuration includes a default JWT secret in `appsettings.Development.json`. For production deployments, you must set a strong JWT secret via the `Jwt__Secret` environment variable. See [Configuration Guide](configuration.md) for details.
+
 ### Database Migrations
 
 ```bash

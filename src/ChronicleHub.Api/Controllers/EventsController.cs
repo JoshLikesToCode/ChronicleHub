@@ -1,14 +1,17 @@
+using System.Security.Claims;
 using System.Text.Json;
 using ChronicleHub.Api.Contracts.Common;
 using ChronicleHub.Api.Contracts.Events;
 using ChronicleHub.Api.ExtensionMethods;
 using ChronicleHub.Api.Middleware;
 using ChronicleHub.Api.Validators;
+using ChronicleHub.Domain.Constants;
 using ChronicleHub.Infrastructure.Services;
 using ChronicleHub.Domain.Entities;
 using ChronicleHub.Domain.Exceptions;
 using ChronicleHub.Infrastructure.Persistence;
 using FluentValidation;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -37,6 +40,7 @@ public class EventsController : ControllerBase
 
     // POST /api/events
     [HttpPost]
+    [Authorize(AuthenticationSchemes = "ApiKey")]
     [ProducesResponseType(typeof(EventResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> CreateEvent(
@@ -57,8 +61,14 @@ public class EventsController : ControllerBase
             return ValidationProblem(ModelState);
         }
 
-        // TODO: replace with real tenant/user from auth later
-        var tenantId = Guid.Empty;
+        // Extract tenant from API key authentication
+        var tenantIdClaim = User.FindFirst("tid")?.Value;
+        if (!Guid.TryParse(tenantIdClaim, out var tenantId))
+        {
+            throw new UnauthorizedException("Tenant ID not found in authentication context");
+        }
+
+        // For API key auth, UserId is Guid.Empty (service account)
         var userId = Guid.Empty;
 
         var payloadJson = request.Payload.GetRawText();
@@ -109,6 +119,7 @@ public class EventsController : ControllerBase
 
     // GET /api/events/{id}
     [HttpGet("{id:guid}")]
+    [Authorize(Policy = AuthPolicies.RequireTenantMembership)]
     [ProducesResponseType(typeof(ApiResponse<EventResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<EventResponse>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetById(Guid id, CancellationToken ct)
@@ -149,6 +160,7 @@ public class EventsController : ControllerBase
     
     // GET /api/events/?
     [HttpGet]
+    [Authorize(Policy = AuthPolicies.RequireTenantMembership)]
     public async Task<ActionResult<PagedEventsResponse<EventSummaryResponse>>> GetEvents(
         [FromQuery] GetEventsRequest request,
         CancellationToken ct)

@@ -27,7 +27,8 @@ The build process:
 ```bash
 docker run -p 8080:8080 \
   -e ConnectionStrings__DefaultConnection="Data Source=/data/chroniclehub.db" \
-  -e ApiKey__Key="your-secret-api-key" \
+  -e Jwt__Secret="development-secret-key-minimum-32-chars-long" \
+  -e Jwt__ExpiresInMinutes=60 \
   -e Swagger__Enabled=true \
   -v $(pwd)/data:/data \
   chroniclehub-api
@@ -46,7 +47,9 @@ All configuration is done via environment variables. See [Configuration Guide](.
 | Variable | Description | Example |
 |----------|-------------|---------|
 | `ConnectionStrings__DefaultConnection` | Database connection | `Data Source=/data/chroniclehub.db` |
-| `ApiKey__Key` | API key for write operations | `prod-secure-key-xyz789` |
+| `Jwt__Secret` | JWT signing secret (required) | `$(openssl rand -base64 48)` |
+| `Jwt__ExpiresInMinutes` | Access token lifetime | `15` (prod), `60` (dev) |
+| `Jwt__RefreshTokenLifetimeDays` | Refresh token lifetime | `7` (prod), `30` (dev) |
 | `Swagger__Enabled` | Enable Swagger UI | `true` or `false` |
 | `ASPNETCORE_ENVIRONMENT` | Environment name | `Development`, `Production` |
 
@@ -57,7 +60,9 @@ docker run -d \
   --name chroniclehub-api \
   -p 8080:8080 \
   -e ConnectionStrings__DefaultConnection="Data Source=/data/chroniclehub.db" \
-  -e ApiKey__Key="my-secure-key" \
+  -e Jwt__Secret="$(openssl rand -base64 48)" \
+  -e Jwt__ExpiresInMinutes=15 \
+  -e Jwt__RefreshTokenLifetimeDays=7 \
   -e Swagger__Enabled=false \
   -e ASPNETCORE_ENVIRONMENT=Production \
   -v chroniclehub-data:/data \
@@ -72,7 +77,9 @@ docker run -d \
   --name chroniclehub-api \
   -p 8080:8080 \
   -e ConnectionStrings__DefaultConnection="Host=postgres-host;Database=chroniclehub;Username=app;Password=secret" \
-  -e ApiKey__Key="my-secure-key" \
+  -e Jwt__Secret="$(openssl rand -base64 48)" \
+  -e Jwt__ExpiresInMinutes=15 \
+  -e Jwt__RefreshTokenLifetimeDays=7 \
   -e Swagger__Enabled=false \
   -e ASPNETCORE_ENVIRONMENT=Production \
   --restart unless-stopped \
@@ -93,7 +100,9 @@ services:
       - "8080:8080"
     environment:
       - ConnectionStrings__DefaultConnection=Host=postgres;Database=chroniclehub;Username=app;Password=dev123
-      - ApiKey__Key=dev-chronicle-hub-key-12345
+      - Jwt__Secret=development-secret-key-minimum-32-chars-long-do-not-use-in-prod
+      - Jwt__ExpiresInMinutes=60
+      - Jwt__RefreshTokenLifetimeDays=30
       - Swagger__Enabled=true
       - ASPNETCORE_ENVIRONMENT=Development
     depends_on:
@@ -166,7 +175,7 @@ docker logs chroniclehub-api
 ```
 
 Common issues:
-- Missing required environment variables (ApiKey__Key)
+- Missing required environment variables (Jwt__Secret)
 - Invalid database connection string
 - Port 8080 already in use
 
@@ -201,12 +210,23 @@ chmod 777 data  # Or use specific UID/GID matching container
    -e Swagger__Enabled=false
    ```
 
-2. **Use strong API keys**:
+2. **Use strong JWT secrets**:
    ```bash
-   -e ApiKey__Key="$(openssl rand -base64 32)"
+   -e Jwt__Secret="$(openssl rand -base64 48)"
    ```
 
-3. **Run with read-only root filesystem** (if using PostgreSQL):
+3. **Use environment-specific JWT token lifetimes**:
+   ```bash
+   # Production (short-lived tokens)
+   -e Jwt__ExpiresInMinutes=15
+   -e Jwt__RefreshTokenLifetimeDays=7
+
+   # Development (longer for convenience)
+   -e Jwt__ExpiresInMinutes=60
+   -e Jwt__RefreshTokenLifetimeDays=30
+   ```
+
+4. **Run with read-only root filesystem** (if using PostgreSQL):
    ```bash
    --read-only \
    --tmpfs /tmp \

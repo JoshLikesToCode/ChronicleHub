@@ -34,6 +34,10 @@ kubectl port-forward svc/chroniclehub 8080:8080
 kubectl create secret generic chroniclehub-db-secret \
   --from-literal=connectionString="Host=postgres-host;Database=chroniclehub;Username=user;Password=pass;SSL Mode=Require"
 
+# Create JWT secret (generate strong secret for production)
+kubectl create secret generic chroniclehub-jwt-secret \
+  --from-literal=jwt-secret="$(openssl rand -base64 48)"
+
 # Deploy with production values
 helm install chroniclehub ./helm/chroniclehub \
   -f ./helm/chroniclehub/values-postgres-initcontainer.yaml
@@ -176,6 +180,11 @@ kubectl create secret generic chroniclehub-db-secret \
   --namespace chroniclehub \
   --from-literal=connectionString="Server=YOURSERVER.database.windows.net;Database=chroniclehub;User Id=YOUR_USER;Password=YOUR_PASSWORD;Encrypt=True"
 
+# Create JWT secret
+kubectl create secret generic chroniclehub-jwt-secret \
+  --namespace chroniclehub \
+  --from-literal=jwt-secret="$(openssl rand -base64 48)"
+
 # Deploy
 helm install chroniclehub ./helm/chroniclehub \
   --namespace chroniclehub \
@@ -192,9 +201,13 @@ kubectl logs job/chroniclehub-migration -n chroniclehub
 ### PostgreSQL with Auto-Scaling
 
 ```bash
-# Create secret
+# Create database secret
 kubectl create secret generic chroniclehub-db-secret \
   --from-literal=connectionString="Host=postgres.example.com;Database=chroniclehub;Username=app_user;Password=STRONG_PASSWORD;SSL Mode=Require"
+
+# Create JWT secret
+kubectl create secret generic chroniclehub-jwt-secret \
+  --from-literal=jwt-secret="$(openssl rand -base64 48)"
 
 # Deploy with custom values
 helm install chroniclehub ./helm/chroniclehub \

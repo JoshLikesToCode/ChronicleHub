@@ -307,7 +307,56 @@ helm install chroniclehub ./helm/chroniclehub \
 ## Important Notes
 
 ### Authentication/Authorization
-Authentication and authorization are currently disabled (see Program.cs:42-43). TenantId and UserId are hardcoded to Guid.Empty in controllers. This needs to be implemented before production use.
+ChronicleHub implements a **dual authentication system**:
+
+#### JWT Bearer Tokens (User/Interactive Endpoints)
+- **Used for**: Auth endpoints, querying events, stats, admin operations, UI-backed features
+- **Authentication**: ASP.NET Core Identity with JWT tokens
+- **Authorization**: Policy-based with tenant membership validation
+- **Access tokens**: Expire after 15 minutes (production) or 60 minutes (development)
+- **Refresh tokens**: HttpOnly, Secure, SameSite=Strict cookies with 7-30 day lifetime
+- **Protected endpoints**: Require `[Authorize(Policy = AuthPolicies.RequireTenantMembership)]`
+
+#### API Key Authentication (Service-to-Service)
+- **Used for**: POST /api/events (event ingestion from external systems)
+- **Format**: Tenant-scoped keys with SHA256 hashing and "ch_live_" prefix
+- **Features**: Expiration dates, revocation support, usage tracking
+- **Security**: Only hash persisted to database, never plaintext
+- **Protected endpoints**: Require `[Authorize(AuthenticationSchemes = "ApiKey")]`
+
+#### Multi-Tenancy Architecture
+- **Database**: Tenant, UserTenants, ApiKeys, RefreshTokens tables (source of truth)
+- **JWT Claims**: TenantId included for efficient authorization
+- **Query Filters**: Global filters automatically enforce tenant isolation at DB level
+- **Membership**: Users can belong to multiple tenants with roles (Owner, Admin, Member)
+- **Isolation**: TenantResolutionMiddleware sets tenant context from JWT claims
+
+#### Security Features
+- Password requirements: min 8 chars, uppercase, lowercase, digit
+- Refresh token rotation on each use (prevents token replay)
+- SHA256 hashing for API keys and refresh tokens
+- Global query filters prevent cross-tenant data access
+- Service account pattern (Guid.Empty UserId) for API key events
+
+#### Auth Endpoints (all at /api/auth)
+- POST /register - Create user account and tenant
+- POST /login - Authenticate and get access token
+- POST /refresh - Rotate refresh token and get new access token
+- POST /logout - Revoke refresh token
+
+#### Configuration
+JWT settings in appsettings.json:
+```json
+{
+  "Jwt": {
+    "Secret": "your-secret-key-minimum-32-characters",
+    "Issuer": "ChronicleHub",
+    "Audience": "ChronicleHub",
+    "ExpiresInMinutes": 15,
+    "RefreshTokenLifetimeDays": 7
+  }
+}
+```
 
 ### Domain Entities
 Domain entities use private setters and constructors to enforce encapsulation. When creating new entities, follow the pattern in `ActivityEvent.cs`:

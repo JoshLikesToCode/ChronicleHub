@@ -10,13 +10,25 @@ Complete reference for all ChronicleHub API endpoints.
 
 ## Authentication
 
-**Write operations** (POST, PUT, PATCH, DELETE) require an API key.
+ChronicleHub uses a **dual authentication system**:
 
-**Read operations** (GET) are publicly accessible.
+- **JWT Bearer Tokens**: For user interactions (auth, querying, stats)
+  - Header: `Authorization: Bearer {token}`
+- **API Keys**: For service-to-service event ingestion
+  - Header: `X-Api-Key: {api-key}`
 
-**Header:** `X-Api-Key: your-api-key-here`
+See [Authentication Guide](authentication.md) for complete details.
 
-See [Authentication Guide](authentication.md) for details.
+### Quick Reference
+
+| Endpoint | Authentication |
+|----------|----------------|
+| POST /api/events | API Key required |
+| GET /api/events | JWT required |
+| GET /api/events/{id} | JWT required |
+| GET /api/stats/* | JWT required |
+| POST /api/auth/* | None (public) |
+| GET /health/* | None (public) |
 
 ## Events API
 

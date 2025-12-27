@@ -2,12 +2,43 @@
 
 Practical examples for common ChronicleHub API operations.
 
+## Authentication Overview
+
+ChronicleHub uses a **dual authentication system**:
+
+- **API Keys** (`X-Api-Key` header) - For service-to-service event ingestion (`POST /api/events`)
+- **JWT Bearer Tokens** (`Authorization: Bearer` header) - For user interactions (querying events, stats, admin)
+
+See the [Authentication Guide](authentication.md) for complete details.
+
 ## Setup
 
-**Set your API key:**
+### For Event Ingestion (API Key)
+
 ```bash
-export API_KEY="dev-chronicle-hub-key-12345"
+# You'll need a tenant-scoped API key (created via admin API or database)
+export API_KEY="ch_live_a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0"
 export BASE_URL="http://localhost:5000"
+```
+
+### For Queries and Admin (JWT Token)
+
+```bash
+export BASE_URL="http://localhost:5000"
+
+# First, register a user and tenant
+curl -X POST $BASE_URL/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@example.com",
+    "password": "SecurePass123",
+    "firstName": "John",
+    "lastName": "Doe",
+    "tenantName": "Acme Corporation"
+  }' | jq -r '.accessToken' > access_token.txt
+
+# Save token for later use
+export JWT_TOKEN=$(cat access_token.txt)
 ```
 
 ## Event Ingestion Examples
@@ -116,52 +147,63 @@ curl -X POST $BASE_URL/api/events \
 
 ## Querying Events
 
+**Note:** All query operations require JWT authentication.
+
 ### Get All Events (Paginated)
 
 ```bash
 # First page (default: 20 items)
-curl $BASE_URL/api/events | jq .
+curl -H "Authorization: Bearer $JWT_TOKEN" \
+  $BASE_URL/api/events | jq .
 
 # Specific page and size
-curl "$BASE_URL/api/events?page=2&pageSize=50" | jq .
+curl -H "Authorization: Bearer $JWT_TOKEN" \
+  "$BASE_URL/api/events?page=2&pageSize=50" | jq .
 ```
 
 ### Filter by Event Type
 
 ```bash
 # Get all login events
-curl "$BASE_URL/api/events?type=user_login" | jq .
+curl -H "Authorization: Bearer $JWT_TOKEN" \
+  "$BASE_URL/api/events?type=user_login" | jq .
 
 # Get all purchases
-curl "$BASE_URL/api/events?type=purchase" | jq .
+curl -H "Authorization: Bearer $JWT_TOKEN" \
+  "$BASE_URL/api/events?type=purchase" | jq .
 ```
 
 ### Filter by Source
 
 ```bash
 # Events from mobile app
-curl "$BASE_URL/api/events?source=MobileApp" | jq .
+curl -H "Authorization: Bearer $JWT_TOKEN" \
+  "$BASE_URL/api/events?source=MobileApp" | jq .
 
 # Events from web app
-curl "$BASE_URL/api/events?source=WebApp" | jq .
+curl -H "Authorization: Bearer $JWT_TOKEN" \
+  "$BASE_URL/api/events?source=WebApp" | jq .
 ```
 
 ### Filter by Date Range
 
 ```bash
 # Events in December 2025
-curl "$BASE_URL/api/events?startDate=2025-12-01&endDate=2025-12-31" | jq .
+curl -H "Authorization: Bearer $JWT_TOKEN" \
+  "$BASE_URL/api/events?startDate=2025-12-01&endDate=2025-12-31" | jq .
 
 # Events in last 7 days
 START_DATE=$(date -d '7 days ago' +%Y-%m-%d)
-curl "$BASE_URL/api/events?startDate=$START_DATE" | jq .
+curl -H "Authorization: Bearer $JWT_TOKEN" \
+  "$BASE_URL/api/events?startDate=$START_DATE" | jq .
 ```
 
 ### Complex Filtering
 
 ```bash
 # Mobile app purchases in December
-curl "$BASE_URL/api/events?type=purchase&source=MobileApp&startDate=2025-12-01&endDate=2025-12-31" | jq .
+curl -H "Authorization: Bearer $JWT_TOKEN" \
+  "$BASE_URL/api/events?type=purchase&source=MobileApp&startDate=2025-12-01&endDate=2025-12-31" | jq .
 ```
 
 ### Get Event by ID
@@ -169,30 +211,37 @@ curl "$BASE_URL/api/events?type=purchase&source=MobileApp&startDate=2025-12-01&e
 ```bash
 # Get specific event
 EVENT_ID="3fa85f64-5717-4562-b3fc-2c963f66afa6"
-curl "$BASE_URL/api/events/$EVENT_ID" | jq .
+curl -H "Authorization: Bearer $JWT_TOKEN" \
+  "$BASE_URL/api/events/$EVENT_ID" | jq .
 ```
 
 ## Statistics Queries
+
+**Note:** All stats operations require JWT authentication.
 
 ### Get Daily Statistics
 
 ```bash
 # Today's stats
 TODAY=$(date +%Y-%m-%d)
-curl "$BASE_URL/api/stats/daily/$TODAY" | jq .
+curl -H "Authorization: Bearer $JWT_TOKEN" \
+  "$BASE_URL/api/stats/daily/$TODAY" | jq .
 
 # Specific date
-curl "$BASE_URL/api/stats/daily/2025-12-13" | jq .
+curl -H "Authorization: Bearer $JWT_TOKEN" \
+  "$BASE_URL/api/stats/daily/2025-12-13" | jq .
 ```
 
 ### Extract Specific Categories
 
 ```bash
 # Get login count for today
-curl "$BASE_URL/api/stats/daily/$TODAY" | jq '.Data.CategoryBreakdown[] | select(.Category == "user_login")'
+curl -H "Authorization: Bearer $JWT_TOKEN" \
+  "$BASE_URL/api/stats/daily/$TODAY" | jq '.Data.CategoryBreakdown[] | select(.Category == "user_login")'
 
 # Get total events
-curl "$BASE_URL/api/stats/daily/$TODAY" | jq '.Data.TotalEvents'
+curl -H "Authorization: Bearer $JWT_TOKEN" \
+  "$BASE_URL/api/stats/daily/$TODAY" | jq '.Data.TotalEvents'
 ```
 
 ## Bulk Operations
@@ -219,7 +268,8 @@ page=1
 total_pages=1
 
 while [ $page -le $total_pages ]; do
-  response=$(curl -s "$BASE_URL/api/events?page=$page&pageSize=100")
+  response=$(curl -s -H "Authorization: Bearer $JWT_TOKEN" \
+    "$BASE_URL/api/events?page=$page&pageSize=100")
   echo "$response" | jq -r '.Items[]' >> events_export.jsonl
   total_pages=$(echo "$response" | jq -r '((.TotalCount + .PageSize - 1) / .PageSize | floor)')
   page=$((page + 1))
@@ -265,9 +315,28 @@ done
 const axios = require('axios');
 
 const BASE_URL = 'http://localhost:5000';
-const API_KEY = 'dev-chronicle-hub-key-12345';
+const API_KEY = 'ch_live_a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0';
+let jwtToken = null;
 
-// Create event
+// Register and login
+async function registerAndLogin(email, password, firstName, lastName, tenantName) {
+  try {
+    const response = await axios.post(`${BASE_URL}/api/auth/register`, {
+      email,
+      password,
+      firstName,
+      lastName,
+      tenantName
+    });
+    jwtToken = response.data.accessToken;
+    return response.data;
+  } catch (error) {
+    console.error('Error registering:', error.response?.data || error.message);
+    throw error;
+  }
+}
+
+// Create event using API key
 async function createEvent(type, source, payload) {
   try {
     const response = await axios.post(`${BASE_URL}/api/events`, {
@@ -287,13 +356,56 @@ async function createEvent(type, source, payload) {
   }
 }
 
+// Query events using JWT
+async function getEvents(page = 1, pageSize = 20, type = null) {
+  try {
+    const params = { page, pageSize };
+    if (type) params.type = type;
+
+    const response = await axios.get(`${BASE_URL}/api/events`, {
+      params,
+      headers: { 'Authorization': `Bearer ${jwtToken}` }
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error querying events:', error.response?.data || error.message);
+    throw error;
+  }
+}
+
+// Get daily stats using JWT
+async function getDailyStats(date) {
+  try {
+    const response = await axios.get(`${BASE_URL}/api/stats/daily/${date}`, {
+      headers: { 'Authorization': `Bearer ${jwtToken}` }
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error getting stats:', error.response?.data || error.message);
+    throw error;
+  }
+}
+
 // Usage
-createEvent('page_view', 'WebApp', {
-  page: '/home',
-  userId: 'user-123'
-}).then(event => {
+(async () => {
+  // First, register and login
+  await registerAndLogin('user@example.com', 'SecurePass123', 'John', 'Doe', 'Acme Corp');
+
+  // Create event using API key
+  const event = await createEvent('page_view', 'WebApp', {
+    page: '/home',
+    userId: 'user-123'
+  });
   console.log('Created event:', event.Id);
-});
+
+  // Query events using JWT
+  const events = await getEvents(1, 20, 'page_view');
+  console.log('Found events:', events.TotalCount);
+
+  // Get stats using JWT
+  const stats = await getDailyStats('2025-12-27');
+  console.log('Total events:', stats.Data.TotalEvents);
+})();
 ```
 
 ### Python
@@ -303,10 +415,29 @@ import requests
 from datetime import datetime
 
 BASE_URL = 'http://localhost:5000'
-API_KEY = 'dev-chronicle-hub-key-12345'
+API_KEY = 'ch_live_a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0'
+JWT_TOKEN = None  # Will be set after login
+
+def register_and_login(email, password, first_name, last_name, tenant_name):
+    """Register a new user and get JWT token"""
+    global JWT_TOKEN
+    response = requests.post(
+        f'{BASE_URL}/api/auth/register',
+        json={
+            'email': email,
+            'password': password,
+            'firstName': first_name,
+            'lastName': last_name,
+            'tenantName': tenant_name
+        }
+    )
+    response.raise_for_status()
+    result = response.json()
+    JWT_TOKEN = result['accessToken']
+    return result
 
 def create_event(event_type, source, payload):
-    """Create a new event"""
+    """Create a new event using API key"""
     response = requests.post(
         f'{BASE_URL}/api/events',
         json={
@@ -319,21 +450,47 @@ def create_event(event_type, source, payload):
     response.raise_for_status()
     return response.json()
 
+def get_events(page=1, page_size=20, event_type=None):
+    """Query events using JWT token"""
+    params = {'page': page, 'pageSize': page_size}
+    if event_type:
+        params['type'] = event_type
+
+    response = requests.get(
+        f'{BASE_URL}/api/events',
+        params=params,
+        headers={'Authorization': f'Bearer {JWT_TOKEN}'}
+    )
+    response.raise_for_status()
+    return response.json()
+
 def get_daily_stats(date):
-    """Get statistics for a date"""
-    response = requests.get(f'{BASE_URL}/api/stats/daily/{date}')
+    """Get statistics for a date using JWT token"""
+    response = requests.get(
+        f'{BASE_URL}/api/stats/daily/{date}',
+        headers={'Authorization': f'Bearer {JWT_TOKEN}'}
+    )
     response.raise_for_status()
     return response.json()
 
 # Usage
+# First, register and login
+register_and_login('user@example.com', 'SecurePass123', 'John', 'Doe', 'Acme Corp')
+
+# Create event using API key
 event = create_event('user_login', 'WebApp', {
     'userId': 'user-123',
     'loginMethod': 'email'
 })
 print(f"Created event: {event['Id']}")
 
-stats = get_daily_stats('2025-12-13')
-print(f"Total events: {stats['Data']['TotalEvents']}")
+# Query events using JWT
+events = get_events(event_type='user_login')
+print(f"Found {events['TotalCount']} login events")
+
+# Get stats using JWT
+stats = get_daily_stats('2025-12-27')
+print(f"Total events today: {stats['Data']['TotalEvents']}")
 ```
 
 ### C# / .NET
@@ -341,16 +498,35 @@ print(f"Total events: {stats['Data']['TotalEvents']}")
 ```csharp
 using System.Net.Http;
 using System.Net.Http.Json;
+using System.Net.Http.Headers;
 
 public class ChronicleHubClient
 {
     private readonly HttpClient _httpClient;
     private readonly string _apiKey;
+    private string _jwtToken;
 
     public ChronicleHubClient(string baseUrl, string apiKey)
     {
         _httpClient = new HttpClient { BaseAddress = new Uri(baseUrl) };
         _apiKey = apiKey;
+    }
+
+    public async Task RegisterAndLoginAsync(string email, string password,
+        string firstName, string lastName, string tenantName)
+    {
+        var response = await _httpClient.PostAsJsonAsync("/api/auth/register", new
+        {
+            Email = email,
+            Password = password,
+            FirstName = firstName,
+            LastName = lastName,
+            TenantName = tenantName
+        });
+        response.EnsureSuccessStatusCode();
+
+        var result = await response.Content.ReadFromJsonAsync<AuthResult>();
+        _jwtToken = result.AccessToken;
     }
 
     public async Task<EventResponse> CreateEventAsync(string type, string source, object payload)
@@ -370,16 +546,55 @@ public class ChronicleHubClient
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadFromJsonAsync<EventResponse>();
     }
+
+    public async Task<PagedEventsResponse> GetEventsAsync(int page = 1, int pageSize = 20, string type = null)
+    {
+        var query = $"/api/events?page={page}&pageSize={pageSize}";
+        if (!string.IsNullOrEmpty(type))
+            query += $"&type={type}";
+
+        var request = new HttpRequestMessage(HttpMethod.Get, query);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _jwtToken);
+
+        var response = await _httpClient.SendAsync(request);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<PagedEventsResponse>();
+    }
+
+    public async Task<DailyStatsResponse> GetDailyStatsAsync(string date)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Get, $"/api/stats/daily/{date}");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _jwtToken);
+
+        var response = await _httpClient.SendAsync(request);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<DailyStatsResponse>();
+    }
 }
 
 // Usage
-var client = new ChronicleHubClient("http://localhost:5000", "dev-chronicle-hub-key-12345");
+var client = new ChronicleHubClient("http://localhost:5000",
+    "ch_live_a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0");
+
+// Register and login
+await client.RegisterAndLoginAsync("user@example.com", "SecurePass123",
+    "John", "Doe", "Acme Corp");
+
+// Create event using API key
 var event = await client.CreateEventAsync("page_view", "WebApp", new
 {
     page = "/home",
     userId = "user-123"
 });
 Console.WriteLine($"Created event: {event.Id}");
+
+// Query events using JWT
+var events = await client.GetEventsAsync(page: 1, pageSize: 20, type: "page_view");
+Console.WriteLine($"Found {events.TotalCount} events");
+
+// Get stats using JWT
+var stats = await client.GetDailyStatsAsync("2025-12-27");
+Console.WriteLine($"Total events: {stats.Data.TotalEvents}");
 ```
 
 ## Testing with Sample Data

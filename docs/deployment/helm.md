@@ -326,13 +326,30 @@ kubectl create secret generic chroniclehub-secrets \
 
 Never store secrets in values.yaml. Use Kubernetes Secrets or external secret managers:
 
+**Create secrets:**
+```bash
+# Create JWT secret
+kubectl create secret generic chroniclehub-secrets \
+  --from-literal=jwt-secret="$(openssl rand -base64 48)"
+
+# Create database secret
+kubectl create secret generic chroniclehub-db-secret \
+  --from-literal=connection-string="Host=postgres;Database=chroniclehub;..."
+```
+
+**Reference in values.yaml:**
 ```yaml
 env:
-  - name: ApiKey__Key
+  - name: Jwt__Secret
     valueFrom:
       secretKeyRef:
         name: chroniclehub-secrets
-        key: api-key
+        key: jwt-secret
+  - name: ConnectionStrings__DefaultConnection
+    valueFrom:
+      secretKeyRef:
+        name: chroniclehub-db-secret
+        key: connection-string
 ```
 
 ### High Availability

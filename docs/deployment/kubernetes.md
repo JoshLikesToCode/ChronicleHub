@@ -130,9 +130,18 @@ Non-sensitive configuration:
 ### secret.yaml
 
 Sensitive configuration (base64 encoded):
-- API key for write operations
+- JWT secret for token signing
+- Database connection strings (for production)
 
 **⚠️ WARNING**: The included secret is for local development only. **DO NOT commit real secrets to version control.**
+
+**Create production secrets:**
+```bash
+# Generate JWT secret
+kubectl create secret generic chroniclehub-secret \
+  --from-literal=jwt-secret="$(openssl rand -base64 48)" \
+  --from-literal=db-connection="Host=postgres;Database=chroniclehub;..."
+```
 
 See [k8s/README.md](../../k8s/README.md) for detailed manifest documentation.
 
@@ -175,7 +184,8 @@ kubectl apply -f https://github.com/bitnami-labs/sealed-secrets/releases/downloa
 
 # Create sealed secret
 kubectl create secret generic chroniclehub-secret \
-  --from-literal=api-key=your-secret-key \
+  --from-literal=jwt-secret="$(openssl rand -base64 48)" \
+  --from-literal=db-connection="Host=postgres;Database=chroniclehub;..." \
   --dry-run=client -o yaml | \
   kubeseal -o yaml > sealed-secret.yaml
 
@@ -196,9 +206,12 @@ spec:
   target:
     name: chroniclehub-secret
   data:
-  - secretKey: api-key
+  - secretKey: jwt-secret
     remoteRef:
-      key: chroniclehub/api-key
+      key: chroniclehub/jwt-secret
+  - secretKey: db-connection
+    remoteRef:
+      key: chroniclehub/database-connection
 ```
 
 ### 3. Service Exposure

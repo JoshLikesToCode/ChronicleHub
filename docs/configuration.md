@@ -39,26 +39,59 @@ The application automatically detects the database type:
 - Contains `Host=` or `Server=` → PostgreSQL
 - Otherwise → SQLite
 
-### API Key
+### JWT Secret
 
-**Environment Variable:** `ApiKey__Key`
+**Environment Variable:** `Jwt__Secret`
 
-**Purpose:** Protects write operations (POST, PUT, PATCH, DELETE). Read operations (GET) are publicly accessible.
+**Purpose:** Signs and validates JWT access tokens for user authentication.
+
+**Security:** MUST be cryptographically strong (minimum 32 characters, recommended 48+).
 
 **Development:**
 ```bash
-export ApiKey__Key="dev-chronicle-hub-key-12345"
+export Jwt__Secret="development-secret-key-minimum-32-chars-long-do-not-use-in-prod"
 ```
 
 **Production:**
 ```bash
-# Generate strong key
-export ApiKey__Key="$(openssl rand -base64 32)"
+# Generate strong secret (recommended)
+export Jwt__Secret="$(openssl rand -base64 48)"
+
+# Example output: "xL9k2jP8vQ1mN4bT7wR6yU5zS3aD0fG8hJ2kL5nM9pQ1rT4vW7xZ0cE3gI6jK9"
 ```
 
-**Usage:** Include in request header as `X-Api-Key`:
+**Additional JWT Configuration:**
 ```bash
-curl -H "X-Api-Key: your-api-key-here" ...
+# Token expiration (minutes)
+export Jwt__ExpiresInMinutes=15             # Production: 15 minutes
+export Jwt__ExpiresInMinutes=60             # Development: 60 minutes
+
+# Refresh token lifetime (days)
+export Jwt__RefreshTokenLifetimeDays=7      # Production: 7 days
+export Jwt__RefreshTokenLifetimeDays=30     # Development: 30 days
+
+# Issuer and Audience (optional, defaults to "ChronicleHub")
+export Jwt__Issuer="ChronicleHub"
+export Jwt__Audience="ChronicleHub"
+```
+
+**Kubernetes Secret Example:**
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: chroniclehub-jwt
+type: Opaque
+stringData:
+  jwt-secret: "xL9k2jP8vQ1mN4bT7wR6yU5zS3aD0fG8hJ2kL5nM9pQ1rT4vW7xZ0cE3gI6jK9"
+---
+# In deployment
+env:
+- name: Jwt__Secret
+  valueFrom:
+    secretKeyRef:
+      name: chroniclehub-jwt
+      key: jwt-secret
 ```
 
 ## Optional Configuration
@@ -167,7 +200,9 @@ export Serilog__WriteTo__1__Args__rollingInterval=Day
 ```bash
 export ASPNETCORE_ENVIRONMENT=Development
 export ConnectionStrings__DefaultConnection="Data Source=chroniclehub.db"
-export ApiKey__Key="dev-chronicle-hub-key-12345"
+export Jwt__Secret="development-secret-key-minimum-32-chars-long-do-not-use-in-prod"
+export Jwt__ExpiresInMinutes=60
+export Jwt__RefreshTokenLifetimeDays=30
 export Swagger__Enabled=true
 export Urls="http://localhost:5000"
 
@@ -179,7 +214,9 @@ dotnet run --project src/ChronicleHub.Api/ChronicleHub.Api.csproj
 ```bash
 docker run -p 8080:8080 \
   -e ConnectionStrings__DefaultConnection="Data Source=/data/chroniclehub.db" \
-  -e ApiKey__Key="prod-secure-key-xyz789" \
+  -e Jwt__Secret="$(openssl rand -base64 48)" \
+  -e Jwt__ExpiresInMinutes=15 \
+  -e Jwt__RefreshTokenLifetimeDays=7 \
   -e Swagger__Enabled=false \
   -e ASPNETCORE_ENVIRONMENT=Production \
   -v chroniclehub-data:/data \
@@ -191,7 +228,9 @@ docker run -p 8080:8080 \
 ```bash
 docker run -p 8080:8080 \
   -e ConnectionStrings__DefaultConnection="Host=postgres;Database=chroniclehub;Username=app;Password=secret" \
-  -e ApiKey__Key="prod-secure-key-xyz789" \
+  -e Jwt__Secret="$(openssl rand -base64 48)" \
+  -e Jwt__ExpiresInMinutes=15 \
+  -e Jwt__RefreshTokenLifetimeDays=7 \
   -e Swagger__Enabled=false \
   -e ASPNETCORE_ENVIRONMENT=Production \
   chroniclehub-api
@@ -208,6 +247,8 @@ metadata:
 data:
   SWAGGER_ENABLED: "false"
   SERVICE_NAME: "ChronicleHub-Production"
+  JWT_EXPIRES_IN_MINUTES: "15"
+  JWT_REFRESH_TOKEN_LIFETIME_DAYS: "7"
 ```
 
 **secret.yaml:**
@@ -218,18 +259,28 @@ metadata:
   name: chroniclehub-secret
 type: Opaque
 stringData:
-  api-key: "prod-secure-key-xyz789"
+  jwt-secret: "xL9k2jP8vQ1mN4bT7wR6yU5zS3aD0fG8hJ2kL5nM9pQ1rT4vW7xZ0cE3gI6jK9"
   db-connection: "Host=postgres;Database=chroniclehub;Username=app;Password=secret"
 ```
 
 **deployment.yaml:**
 ```yaml
 env:
-- name: ApiKey__Key
+- name: Jwt__Secret
   valueFrom:
     secretKeyRef:
       name: chroniclehub-secret
-      key: api-key
+      key: jwt-secret
+- name: Jwt__ExpiresInMinutes
+  valueFrom:
+    configMapKeyRef:
+      name: chroniclehub-config
+      key: JWT_EXPIRES_IN_MINUTES
+- name: Jwt__RefreshTokenLifetimeDays
+  valueFrom:
+    configMapKeyRef:
+      name: chroniclehub-config
+      key: JWT_REFRESH_TOKEN_LIFETIME_DAYS
 - name: ConnectionStrings__DefaultConnection
   valueFrom:
     secretKeyRef:
@@ -262,19 +313,37 @@ While environment variables are preferred, configuration can also come from JSON
 
 ## Security Best Practices
 
-### API Keys
+### JWT Secrets
 
 ✅ **DO:**
-- Generate cryptographically strong keys: `openssl rand -base64 32`
-- Store in secrets management systems (Azure Key Vault, AWS Secrets Manager, etc.)
-- Rotate regularly
-- Use different keys per environment
+- Generate cryptographically strong secrets: `openssl rand -base64 48`
+- Minimum 32 characters, recommend 48+ characters
+- Store in secrets management systems (Azure Key Vault, AWS Secrets Manager, HashiCorp Vault)
+- Use different secrets per environment
+- Rotate JWT secrets periodically (requires user re-authentication)
+- Use HTTPS/TLS in production to protect tokens in transit
 
 ❌ **DON'T:**
-- Commit to version control
-- Use weak or guessable keys
-- Share across environments
-- Log API keys
+- Commit JWT secrets to version control
+- Use weak or guessable secrets like "secret", "password", "12345"
+- Share JWT secrets across environments
+- Log JWT secrets or tokens
+- Store tokens in localStorage (vulnerable to XSS)
+
+### API Keys (Tenant-Scoped)
+
+✅ **DO:**
+- Create unique API keys per tenant and service
+- Use the built-in key generation with "ch_live_" prefix
+- Store API key hashes (SHA256) in database, never plaintext
+- Set expiration dates on API keys
+- Revoke compromised keys immediately
+- Track API key usage via LastUsedAtUtc
+
+❌ **DON'T:**
+- Share API keys across tenants
+- Store plaintext API keys
+- Log API keys in application logs
 
 ### Database Credentials
 
@@ -303,17 +372,30 @@ While environment variables are preferred, configuration can also come from JSON
 
 ## Troubleshooting
 
-### "API Key is required" Error
+### Authentication Errors
 
-**Problem:** Missing or invalid API key for write operations.
+**Problem:** 401 Unauthorized on JWT-protected endpoints
 
 **Solution:**
 ```bash
-# Ensure API key is set
-echo $ApiKey__Key
+# Verify JWT token is set
+echo $JWT_TOKEN
 
-# Include in request
-curl -H "X-Api-Key: your-api-key" ...
+# Include Bearer token in request
+curl -H "Authorization: Bearer $JWT_TOKEN" /api/events
+
+# If token expired, refresh or re-login
+curl -X POST /api/auth/refresh  # with refresh token cookie
+```
+
+**Problem:** 403 Forbidden on API key endpoints
+
+**Solution:**
+```bash
+# Verify using API key, not JWT, for event creation
+curl -H "X-Api-Key: ch_live_..." -X POST /api/events
+
+# JWT tokens cannot be used for POST /api/events
 ```
 
 ### Database Connection Errors

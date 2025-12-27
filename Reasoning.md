@@ -227,3 +227,62 @@ Implemented bulletproof database migration strategy for Kubernetes/AKS deploymen
 
 ---
 
+## JWT Authentication & Multi-Tenancy
+
+Implemented enterprise-grade dual authentication system with JWT Bearer tokens for user interactions and API Key authentication for service-to-service event ingestion. Built complete multi-tenant architecture with ASP.NET Core Identity integration, database-backed tenant management, and automatic tenant isolation via global query filters. Created 5 domain entities (Tenant, UserTenant, ApiKey, RefreshToken, ApplicationUser) with immutable patterns and proper encapsulation. Implemented TokenService with JWT generation and SHA256 refresh token hashing, ApiKeyService with prefix-based keys and expiration support, and AuthenticationService orchestrating registration, login, refresh token rotation, and logout flows. Updated DbContext to IdentityDbContext with tenant context management and global query filters enforcing cross-tenant data isolation. Built AuthController with all 4 auth endpoints using HttpOnly/Secure/SameSite refresh token cookies. Configured Program.cs with dual authentication schemes (JWT Bearer + API Key), 5 authorization policies, and TenantResolutionMiddleware for claim-based tenant context. Updated EventsController with dual auth (API key for POST, JWT for GET) and StatsController with tenant membership requirements. Created comprehensive test coverage with 190+ tests: 106 domain unit tests (entities, constants), 69 validator tests (FluentValidation), 14 integration tests (AuthController flows, tenant isolation, dual auth enforcement), and updated test factory with helper methods for user creation and API key generation. Enhanced documentation in CLAUDE.md with complete authentication architecture, security features, configuration examples, and usage patterns.
+
+**Reasoning:** Proper authentication and multi-tenancy are prerequisites for any production SaaS application. The dual authentication approach provides flexibility: JWT tokens enable rich user experiences with role-based access control, while API keys facilitate automated event ingestion from external systems. Global query filters at the database level provide defense-in-depth tenant isolation, preventing cross-tenant data leaks even if application logic has bugs. Refresh token rotation and SHA256 hashing follow security best practices for token management.
+
+**Files Changed:**
+- src/ChronicleHub.Infrastructure/Persistence/ChronicleHubDbContext.cs
+- src/ChronicleHub.Infrastructure/ChronicleHub.Infrastructure.csproj
+- src/ChronicleHub.Application/ChronicleHub.Application.csproj
+- src/ChronicleHub.Application/Validators/RegisterRequestValidator.cs
+- src/ChronicleHub.Application/Validators/LoginRequestValidator.cs
+- src/ChronicleHub.Api/ChronicleHub.Api.csproj
+- src/ChronicleHub.Api/Program.cs
+- src/ChronicleHub.Api/Controllers/EventsController.cs
+- src/ChronicleHub.Api/Controllers/StatsController.cs
+- src/ChronicleHub.Api/appsettings.json
+- src/ChronicleHub.Api/appsettings.Development.json
+- tests/ChronicleHub.Api.IntegrationTests/ChronicleHubWebApplicationFactory.cs
+- CLAUDE.md
+- README.md
+
+**Files Added:**
+- src/ChronicleHub.Domain/Entities/Tenant.cs
+- src/ChronicleHub.Domain/Entities/UserTenant.cs
+- src/ChronicleHub.Domain/Entities/ApiKey.cs
+- src/ChronicleHub.Domain/Entities/RefreshToken.cs
+- src/ChronicleHub.Domain/Identity/ApplicationUser.cs
+- src/ChronicleHub.Domain/Constants/Roles.cs
+- src/ChronicleHub.Domain/Constants/AuthPolicies.cs
+- src/ChronicleHub.Infrastructure/Services/ITokenService.cs
+- src/ChronicleHub.Infrastructure/Services/TokenService.cs
+- src/ChronicleHub.Infrastructure/Services/IApiKeyService.cs
+- src/ChronicleHub.Infrastructure/Services/ApiKeyService.cs
+- src/ChronicleHub.Application/Services/IAuthenticationService.cs
+- src/ChronicleHub.Infrastructure/Services/AuthenticationService.cs
+- src/ChronicleHub.Application/DTOs/Auth/RegisterRequest.cs
+- src/ChronicleHub.Application/DTOs/Auth/LoginRequest.cs
+- src/ChronicleHub.Application/DTOs/Auth/AuthResult.cs
+- src/ChronicleHub.Application/Validators/RegisterRequestValidator.cs
+- src/ChronicleHub.Application/Validators/LoginRequestValidator.cs
+- src/ChronicleHub.Api/Controllers/AuthController.cs
+- src/ChronicleHub.Api/Authentication/ApiKeyAuthenticationHandler.cs
+- src/ChronicleHub.Api/Middleware/TenantResolutionMiddleware.cs
+- src/ChronicleHub.Infrastructure/Persistence/Migrations/20251227203703_AddAuthenticationAndMultiTenancy.cs
+- tests/ChronicleHub.Domain.Tests/Entities/TenantTests.cs
+- tests/ChronicleHub.Domain.Tests/Entities/UserTenantTests.cs
+- tests/ChronicleHub.Domain.Tests/Entities/ApiKeyTests.cs
+- tests/ChronicleHub.Domain.Tests/Entities/RefreshTokenTests.cs
+- tests/ChronicleHub.Domain.Tests/Constants/RolesTests.cs
+- tests/ChronicleHub.Application.Tests/Validators/RegisterRequestValidatorTests.cs
+- tests/ChronicleHub.Application.Tests/Validators/LoginRequestValidatorTests.cs
+- tests/ChronicleHub.Api.IntegrationTests/Controllers/AuthControllerTests.cs
+- tests/ChronicleHub.Api.IntegrationTests/TenantIsolationTests.cs
+
+**Timestamp:** 2025-12-27 20:59:00 UTC
+
+---
+
