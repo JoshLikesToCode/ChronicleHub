@@ -280,7 +280,7 @@ ChronicleHub/
 
 ## 🚧 Roadmap
 
-- [ ] JWT-based authentication with multi-tenant support
+- [X] JWT-based authentication with multi-tenant support
 - [ ] Time-series analytics endpoints
 - [ ] Real-time statistics via SignalR
 - [ ] Event replay and reprocessing
