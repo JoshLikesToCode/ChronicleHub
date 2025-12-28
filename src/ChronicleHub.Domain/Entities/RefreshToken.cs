@@ -10,17 +10,16 @@ public sealed class RefreshToken
     public DateTime? RevokedAtUtc { get; private set; }
     public string? RevokedByIp { get; private set; }
     public string? ReplacedByTokenHash { get; private set; }
-    public string CreatedByIp { get; private set; }
+    public string? CreatedByIp { get; private set; }
 
     private RefreshToken()
     {
         // Private parameterless constructor for EF Core
         UserId = string.Empty;
         TokenHash = string.Empty;
-        CreatedByIp = string.Empty;
     }
 
-    public RefreshToken(Guid id, string userId, string tokenHash, DateTime expiresAtUtc, string createdByIp)
+    public RefreshToken(Guid id, string userId, string tokenHash, DateTime expiresAtUtc, string? createdByIp)
     {
         Id = id;
         UserId = userId;
@@ -30,7 +29,7 @@ public sealed class RefreshToken
         CreatedByIp = createdByIp;
     }
 
-    public void Revoke(string revokedByIp, string? replacedByTokenHash = null)
+    public void Revoke(string? revokedByIp, string? replacedByTokenHash = null)
     {
         if (!RevokedAtUtc.HasValue)
         {

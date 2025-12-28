@@ -4,28 +4,132 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using ChronicleHub.Api.Contracts.Common;
 using ChronicleHub.Api.Contracts.Events;
+using ChronicleHub.Application.DTOs.Auth;
 using ChronicleHub.Application.ProblemDetails;
 using FluentAssertions;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace ChronicleHub.Api.IntegrationTests.Controllers;
 
-public class EventsControllerTests : IClassFixture<ChronicleHubWebApplicationFactory>
+[Collection("IntegrationTests")]
+public class EventsControllerTests : IClassFixture<ChronicleHubWebApplicationFactory>, IAsyncDisposable
 {
     private readonly ChronicleHubWebApplicationFactory _factory;
-    private readonly HttpClient _client;
-    private const string ApiKey = "dev-chronicle-hub-key-12345";
 
     public EventsControllerTests(ChronicleHubWebApplicationFactory factory)
     {
         _factory = factory;
-        _client = _factory.CreateClient();
-        _client.DefaultRequestHeaders.Add("X-Api-Key", ApiKey);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        // Clean up database after each test to prevent interference
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ChronicleHub.Infrastructure.Persistence.ChronicleHubDbContext>();
+
+        // Clear all data from the database
+        db.Events.RemoveRange(db.Events);
+        db.ApiKeys.RemoveRange(db.ApiKeys);
+        db.RefreshTokens.RemoveRange(db.RefreshTokens);
+        db.UserTenants.RemoveRange(db.UserTenants);
+        db.Tenants.RemoveRange(db.Tenants);
+
+        // Remove users through UserManager to maintain referential integrity
+        var userManager = scope.ServiceProvider.GetRequiredService<Microsoft.AspNetCore.Identity.UserManager<ChronicleHub.Domain.Identity.ApplicationUser>>();
+        var users = db.Users.ToList();
+        foreach (var user in users)
+        {
+            await userManager.DeleteAsync(user);
+        }
+
+        await db.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Creates an API key client AND a JWT client for the SAME tenant
+    /// This ensures tenant isolation works correctly in tests
+    /// </summary>
+    private async Task<(HttpClient ApiKeyClient, HttpClient JwtClient, Guid TenantId)> CreateSameTenantClientsAsync()
+    {
+        // Create a tenant with user and API key
+        var (tenant, user, apiKey) = await _factory.CreateTestTenantWithUserAndApiKeyAsync(
+            $"tenant-{Guid.NewGuid()}@example.com",
+            "Password123",
+            "Shared Tenant"
+        );
+
+        // Create API key client
+        var apiKeyClient = _factory.CreateClient();
+        apiKeyClient.DefaultRequestHeaders.Add("X-Api-Key", apiKey);
+
+        // Create JWT client by logging in as the tenant's user
+        var jwtClient = _factory.CreateClient();
+        var loginRequest = new LoginRequest(
+            Email: user.Email!,
+            Password: "Password123",
+            TenantId: null
+        );
+        var loginResponse = await jwtClient.PostAsJsonAsync("/api/auth/login", loginRequest);
+
+        if (!loginResponse.IsSuccessStatusCode)
+        {
+            var errorContent = await loginResponse.Content.ReadAsStringAsync();
+            throw new InvalidOperationException($"Login failed: {loginResponse.StatusCode} - {errorContent}");
+        }
+
+        var authResult = await loginResponse.Content.ReadFromJsonAsync<AuthResult>();
+
+        if (authResult == null || !authResult.Success || string.IsNullOrEmpty(authResult.AccessToken))
+        {
+            throw new InvalidOperationException($"Login succeeded but auth result was invalid. Success: {authResult?.Success}, Error: {authResult?.ErrorMessage}");
+        }
+
+        if (authResult.Tenant?.Id != tenant.Id)
+        {
+            throw new InvalidOperationException($"Login returned wrong tenant. Expected: {tenant.Id}, Got: {authResult.Tenant?.Id}");
+        }
+
+        jwtClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", authResult.AccessToken);
+
+        return (apiKeyClient, jwtClient, tenant.Id);
+    }
+
+    private async Task<HttpClient> CreateApiKeyClientAsync()
+    {
+        var client = _factory.CreateClient();
+
+        // Create a tenant with user and API key
+        var (_, _, apiKey) = await _factory.CreateTestTenantWithUserAndApiKeyAsync(
+            $"apikey-{Guid.NewGuid()}@example.com",
+            "Password123",
+            "API Key Tenant"
+        );
+
+        client.DefaultRequestHeaders.Add("X-Api-Key", apiKey);
+        return client;
+    }
+
+    private async Task<HttpClient> CreateAuthenticatedJwtClientAsync()
+    {
+        var client = _factory.CreateClient();
+        var (accessToken, _, _) = await _factory.CreateTestUserAndLoginAsync(
+            client,
+            $"test-{Guid.NewGuid()}@example.com",
+            "SecurePass123",
+            "Test",
+            "User",
+            "Test Tenant"
+        );
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+        return client;
     }
 
     [Fact]
     public async Task CreateEvent_WithValidRequest_ShouldReturnCreatedWithEvent()
     {
         // Arrange
+        var client = await CreateApiKeyClientAsync();
         var request = new
         {
             Type = "page_view",
@@ -35,7 +139,7 @@ public class EventsControllerTests : IClassFixture<ChronicleHubWebApplicationFac
         };
 
         // Act
-        var action = await _client.PostAsJsonAsync("/api/events", request);
+        var action = await client.PostAsJsonAsync("/api/events", request);
 
         // Assert
         action.StatusCode.Should().Be(HttpStatusCode.Created);
@@ -98,6 +202,7 @@ public class EventsControllerTests : IClassFixture<ChronicleHubWebApplicationFac
     public async Task CreateEvent_WithEmptyType_ShouldReturnBadRequest()
     {
         // Arrange
+        var client = await CreateApiKeyClientAsync();
         var request = new
         {
             Type = "",
@@ -107,7 +212,7 @@ public class EventsControllerTests : IClassFixture<ChronicleHubWebApplicationFac
         };
 
         // Act
-        var action = await _client.PostAsJsonAsync("/api/events", request);
+        var action = await client.PostAsJsonAsync("/api/events", request);
 
         // Assert
         action.StatusCode.Should().Be(HttpStatusCode.BadRequest);
@@ -117,6 +222,7 @@ public class EventsControllerTests : IClassFixture<ChronicleHubWebApplicationFac
     public async Task CreateEvent_WithEmptySource_ShouldReturnBadRequest()
     {
         // Arrange
+        var client = await CreateApiKeyClientAsync();
         var request = new
         {
             Type = "test",
@@ -126,7 +232,7 @@ public class EventsControllerTests : IClassFixture<ChronicleHubWebApplicationFac
         };
 
         // Act
-        var action = await _client.PostAsJsonAsync("/api/events", request);
+        var action = await client.PostAsJsonAsync("/api/events", request);
 
         // Assert
         action.StatusCode.Should().Be(HttpStatusCode.BadRequest);
@@ -135,7 +241,9 @@ public class EventsControllerTests : IClassFixture<ChronicleHubWebApplicationFac
     [Fact]
     public async Task GetById_WithExistingEvent_ShouldReturnSuccessEnvelope()
     {
-        // Arrange - Create an event first
+        // Arrange - Create clients for the same tenant
+        var (apiClient, jwtClient, _) = await CreateSameTenantClientsAsync();
+
         var createRequest = new
         {
             Type = "user_login",
@@ -144,11 +252,11 @@ public class EventsControllerTests : IClassFixture<ChronicleHubWebApplicationFac
             Payload = new { userId = "user123", platform = "iOS" }
         };
 
-        var createResponse = await _client.PostAsJsonAsync("/api/events", createRequest);
+        var createResponse = await apiClient.PostAsJsonAsync("/api/events", createRequest);
         var createdEvent = await createResponse.Content.ReadFromJsonAsync<EventResponse>();
 
         // Act
-        var action = await _client.GetAsync($"/api/events/{createdEvent!.Id}");
+        var action = await jwtClient.GetAsync($"/api/events/{createdEvent!.Id}");
 
         // Assert
         action.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -170,10 +278,11 @@ public class EventsControllerTests : IClassFixture<ChronicleHubWebApplicationFac
     public async Task GetById_WithNonExistentEvent_ShouldReturnNotFoundProblemDetails()
     {
         // Arrange
+        var client = await CreateAuthenticatedJwtClientAsync();
         var nonExistentId = Guid.NewGuid();
 
         // Act
-        var action = await _client.GetAsync($"/api/events/{nonExistentId}");
+        var action = await client.GetAsync($"/api/events/{nonExistentId}");
 
         // Assert
         action.StatusCode.Should().Be(HttpStatusCode.NotFound);
@@ -193,22 +302,24 @@ public class EventsControllerTests : IClassFixture<ChronicleHubWebApplicationFac
     [Fact]
     public async Task GetById_WithoutApiKey_ShouldAllowReadOperation()
     {
-        // Arrange - GET requests don't require API key
-        var client = _factory.CreateClient();
+        // Arrange - GET requests require JWT authentication, not API key
+        var client = await CreateAuthenticatedJwtClientAsync();
         var eventId = Guid.NewGuid();
 
         // Act
         var action = await client.GetAsync($"/api/events/{eventId}");
 
         // Assert - Should return 404 (not found) instead of 401 (unauthorized)
-        // This proves the API key check was skipped for the read operation
+        // This proves the request was authenticated with JWT
         action.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
     [Fact]
     public async Task GetById_ResponseMetadata_ShouldIncludeRequestDuration()
     {
-        // Arrange - Create an event
+        // Arrange - Create clients for the same tenant
+        var (apiClient, jwtClient, _) = await CreateSameTenantClientsAsync();
+
         var createRequest = new
         {
             Type = "test_event",
@@ -217,11 +328,11 @@ public class EventsControllerTests : IClassFixture<ChronicleHubWebApplicationFac
             Payload = new { test = true }
         };
 
-        var createResponse = await _client.PostAsJsonAsync("/api/events", createRequest);
+        var createResponse = await apiClient.PostAsJsonAsync("/api/events", createRequest);
         var createdEvent = await createResponse.Content.ReadFromJsonAsync<EventResponse>();
 
         // Act
-        var action = await _client.GetAsync($"/api/events/{createdEvent!.Id}");
+        var action = await jwtClient.GetAsync($"/api/events/{createdEvent!.Id}");
 
         // Assert
         var response = await action.Content.ReadFromJsonAsync<ApiResponse<EventResponse>>();
@@ -233,7 +344,9 @@ public class EventsControllerTests : IClassFixture<ChronicleHubWebApplicationFac
     [Fact]
     public async Task GetEvents_WithoutFilters_ShouldReturnPagedEvents()
     {
-        // Arrange - Create multiple events
+        // Arrange - Create clients for the same tenant
+        var (apiClient, jwtClient, _) = await CreateSameTenantClientsAsync();
+
         for (int i = 0; i < 5; i++)
         {
             var request = new
@@ -243,11 +356,11 @@ public class EventsControllerTests : IClassFixture<ChronicleHubWebApplicationFac
                 TimestampUtc = DateTime.UtcNow.AddMinutes(-i),
                 Payload = new { index = i }
             };
-            await _client.PostAsJsonAsync("/api/events", request);
+            await apiClient.PostAsJsonAsync("/api/events", request);
         }
 
         // Act
-        var action = await _client.GetAsync("/api/events?page=1&pageSize=10");
+        var action = await jwtClient.GetAsync("/api/events?page=1&pageSize=10");
 
         // Assert
         action.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -264,8 +377,10 @@ public class EventsControllerTests : IClassFixture<ChronicleHubWebApplicationFac
     [Fact]
     public async Task GetEvents_WithTypeFilter_ShouldReturnFilteredEvents()
     {
-        // Arrange - Create events with different types
-        await _client.PostAsJsonAsync("/api/events", new
+        // Arrange - Create clients for the same tenant
+        var (apiClient, jwtClient, _) = await CreateSameTenantClientsAsync();
+
+        await apiClient.PostAsJsonAsync("/api/events", new
         {
             Type = "unique_type_filter_test",
             Source = "test",
@@ -273,7 +388,7 @@ public class EventsControllerTests : IClassFixture<ChronicleHubWebApplicationFac
             Payload = new { }
         });
 
-        await _client.PostAsJsonAsync("/api/events", new
+        await apiClient.PostAsJsonAsync("/api/events", new
         {
             Type = "other_type",
             Source = "test",
@@ -282,7 +397,7 @@ public class EventsControllerTests : IClassFixture<ChronicleHubWebApplicationFac
         });
 
         // Act
-        var action = await _client.GetAsync("/api/events?type=unique_type_filter_test&page=1&pageSize=10");
+        var action = await jwtClient.GetAsync("/api/events?type=unique_type_filter_test&page=1&pageSize=10");
 
         // Assert
         action.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -296,8 +411,11 @@ public class EventsControllerTests : IClassFixture<ChronicleHubWebApplicationFac
     [Fact]
     public async Task GetEvents_WithInvalidPageSize_ShouldReturnBadRequest()
     {
-        // Arrange & Act
-        var action = await _client.GetAsync("/api/events?page=1&pageSize=101");
+        // Arrange
+        var client = await CreateAuthenticatedJwtClientAsync();
+
+        // Act
+        var action = await client.GetAsync("/api/events?page=1&pageSize=101");
 
         // Assert
         action.StatusCode.Should().Be(HttpStatusCode.BadRequest);
@@ -306,8 +424,11 @@ public class EventsControllerTests : IClassFixture<ChronicleHubWebApplicationFac
     [Fact]
     public async Task GetEvents_WithInvalidPage_ShouldReturnBadRequest()
     {
-        // Arrange & Act
-        var action = await _client.GetAsync("/api/events?page=0&pageSize=10");
+        // Arrange
+        var client = await CreateAuthenticatedJwtClientAsync();
+
+        // Act
+        var action = await client.GetAsync("/api/events?page=0&pageSize=10");
 
         // Assert
         action.StatusCode.Should().Be(HttpStatusCode.BadRequest);
@@ -316,7 +437,9 @@ public class EventsControllerTests : IClassFixture<ChronicleHubWebApplicationFac
     [Fact]
     public async Task CreateAndRetrieve_FullWorkflow_ShouldWorkEndToEnd()
     {
-        // Arrange
+        // Arrange - Create clients for the same tenant
+        var (apiClient, jwtClient, _) = await CreateSameTenantClientsAsync();
+
         var createRequest = new
         {
             Type = "purchase",
@@ -330,15 +453,15 @@ public class EventsControllerTests : IClassFixture<ChronicleHubWebApplicationFac
             }
         };
 
-        // Act - Create
-        var createAction = await _client.PostAsJsonAsync("/api/events", createRequest);
+        // Act - Create with API key
+        var createAction = await apiClient.PostAsJsonAsync("/api/events", createRequest);
         createAction.StatusCode.Should().Be(HttpStatusCode.Created);
 
         var createdEvent = await createAction.Content.ReadFromJsonAsync<EventResponse>();
         createdEvent.Should().NotBeNull();
 
-        // Act - Retrieve
-        var getAction = await _client.GetAsync($"/api/events/{createdEvent!.Id}");
+        // Act - Retrieve with JWT
+        var getAction = await jwtClient.GetAsync($"/api/events/{createdEvent!.Id}");
         getAction.StatusCode.Should().Be(HttpStatusCode.OK);
 
         var retrievedResponse = await getAction.Content.ReadFromJsonAsync<ApiResponse<EventResponse>>();
@@ -357,10 +480,12 @@ public class EventsControllerTests : IClassFixture<ChronicleHubWebApplicationFac
     [Fact]
     public async Task GetEvents_WithPagination_ShouldRespectPageSize()
     {
-        // Arrange - Create 15 events
+        // Arrange - Create clients for the same tenant
+        var (apiClient, jwtClient, _) = await CreateSameTenantClientsAsync();
+
         for (int i = 0; i < 15; i++)
         {
-            await _client.PostAsJsonAsync("/api/events", new
+            await apiClient.PostAsJsonAsync("/api/events", new
             {
                 Type = $"pagination_test_{i}",
                 Source = "test",
@@ -370,7 +495,7 @@ public class EventsControllerTests : IClassFixture<ChronicleHubWebApplicationFac
         }
 
         // Act
-        var action = await _client.GetAsync("/api/events?page=1&pageSize=5");
+        var action = await jwtClient.GetAsync("/api/events?page=1&pageSize=5");
 
         // Assert
         action.StatusCode.Should().Be(HttpStatusCode.OK);

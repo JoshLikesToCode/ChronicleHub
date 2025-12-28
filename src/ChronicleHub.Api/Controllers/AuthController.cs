@@ -56,13 +56,16 @@ public class AuthController : ControllerBase
 
         SetRefreshTokenCookie(result.RefreshToken!);
 
-        return Ok(new
-        {
-            accessToken = result.AccessToken,
-            expiresAt = result.ExpiresAt,
-            user = result.User,
-            tenant = result.Tenant
-        });
+        // Don't expose refresh token in response body (it's in HttpOnly cookie)
+        return Ok(new AuthResult(
+            result.Success,
+            result.AccessToken,
+            null, // RefreshToken - kept in HttpOnly cookie only
+            result.ExpiresAt,
+            result.User,
+            result.Tenant,
+            result.ErrorMessage
+        ));
     }
 
     [HttpPost("login")]
@@ -93,13 +96,16 @@ public class AuthController : ControllerBase
 
         SetRefreshTokenCookie(result.RefreshToken!);
 
-        return Ok(new
-        {
-            accessToken = result.AccessToken,
-            expiresAt = result.ExpiresAt,
-            user = result.User,
-            tenant = result.Tenant
-        });
+        // Don't expose refresh token in response body (it's in HttpOnly cookie)
+        return Ok(new AuthResult(
+            result.Success,
+            result.AccessToken,
+            null, // RefreshToken - kept in HttpOnly cookie only
+            result.ExpiresAt,
+            result.User,
+            result.Tenant,
+            result.ErrorMessage
+        ));
     }
 
     [HttpPost("refresh")]
@@ -118,13 +124,16 @@ public class AuthController : ControllerBase
 
         SetRefreshTokenCookie(result.RefreshToken!);
 
-        return Ok(new
-        {
-            accessToken = result.AccessToken,
-            expiresAt = result.ExpiresAt,
-            user = result.User,
-            tenant = result.Tenant
-        });
+        // Don't expose refresh token in response body (it's in HttpOnly cookie)
+        return Ok(new AuthResult(
+            result.Success,
+            result.AccessToken,
+            null, // RefreshToken - kept in HttpOnly cookie only
+            result.ExpiresAt,
+            result.User,
+            result.Tenant,
+            result.ErrorMessage
+        ));
     }
 
     [HttpPost("logout")]
@@ -148,8 +157,8 @@ public class AuthController : ControllerBase
         var cookieOptions = new CookieOptions
         {
             HttpOnly = true,
-            Secure = true, // HTTPS only
-            SameSite = SameSiteMode.Strict,
+            Secure = HttpContext.Request.IsHttps, // Secure only for HTTPS
+            SameSite = HttpContext.Request.IsHttps ? SameSiteMode.Strict : SameSiteMode.Lax, // Lax for HTTP (testing)
             Expires = DateTime.UtcNow.AddDays(7)
         };
 

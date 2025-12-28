@@ -11,7 +11,12 @@ public sealed class ActivityEvent
     public string PayloadJson { get; private set; }
     public DateTime CreatedAtUtc { get; private set; }
 
-    private ActivityEvent() { }
+    private ActivityEvent()
+    {
+        Type = string.Empty;
+        Source = string.Empty;
+        PayloadJson = string.Empty;
+    }
 
     public ActivityEvent(
         Guid id,

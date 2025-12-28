@@ -16,7 +16,8 @@ namespace ChronicleHub.Api.IntegrationTests;
 
 public class ChronicleHubWebApplicationFactory : WebApplicationFactory<Program>
 {
-    private static readonly string DatabaseName = $"TestDb_{Guid.NewGuid()}";
+    // Non-static to ensure each test fixture gets its own database instance
+    private readonly string DatabaseName = $"TestDb_{Guid.NewGuid()}";
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -75,8 +76,27 @@ public class ChronicleHubWebApplicationFactory : WebApplicationFactory<Program>
         return host;
     }
 
+    protected override void ConfigureClient(HttpClient client)
+    {
+        base.ConfigureClient(client);
+
+        // Configure client defaults
+        client.Timeout = TimeSpan.FromSeconds(30);
+    }
+
+    public HttpClient CreateClientWithCookies()
+    {
+        var clientOptions = new WebApplicationFactoryClientOptions
+        {
+            HandleCookies = true,
+            AllowAutoRedirect = false
+        };
+        return CreateClient(clientOptions);
+    }
+
     /// <summary>
-    /// Creates a test user with a tenant and returns the access token and tenant ID
+    /// Creates a test user with a tenant and returns the access token and tenant ID.
+    /// NOTE: The provided client must have HandleCookies=true to preserve the refresh token cookie.
     /// </summary>
     public async Task<(string AccessToken, Guid TenantId, string UserId)> CreateTestUserAndLoginAsync(
         HttpClient client,
@@ -89,13 +109,18 @@ public class ChronicleHubWebApplicationFactory : WebApplicationFactory<Program>
         // Register the user
         var registerRequest = new RegisterRequest(email, password, firstName, lastName, tenantName);
         var registerResponse = await client.PostAsJsonAsync("/api/auth/register", registerRequest);
-        registerResponse.EnsureSuccessStatusCode();
+
+        if (!registerResponse.IsSuccessStatusCode)
+        {
+            var errorContent = await registerResponse.Content.ReadAsStringAsync();
+            throw new InvalidOperationException($"Registration failed with {registerResponse.StatusCode}: {errorContent}");
+        }
 
         var authResult = await registerResponse.Content.ReadFromJsonAsync<AuthResult>();
 
         if (authResult == null || !authResult.Success || string.IsNullOrEmpty(authResult.AccessToken))
         {
-            throw new InvalidOperationException("Failed to register and login test user");
+            throw new InvalidOperationException($"Failed to register and login test user. Success: {authResult?.Success}, Error: {authResult?.ErrorMessage}");
         }
 
         return (authResult.AccessToken, authResult.Tenant!.Id, authResult.User!.Id);

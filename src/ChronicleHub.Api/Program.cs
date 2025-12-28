@@ -49,8 +49,9 @@ builder.Services
         o.JsonSerializerOptions.PropertyNamingPolicy = null; // or CamelCase if you prefer
     });
 
-// Add FluentValidation
-builder.Services.AddValidatorsFromAssemblyContaining<Program>();
+// Add FluentValidation - scan both API and Application assemblies
+builder.Services.AddValidatorsFromAssemblyContaining<Program>(); // API validators
+builder.Services.AddValidatorsFromAssemblyContaining<ChronicleHub.Application.DTOs.Auth.RegisterRequest>(); // Application validators
 
 // Configure ASP.NET Core Identity
 builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
@@ -73,6 +74,9 @@ builder.Services.AddAuthentication(options =>
 })
 .AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, options =>
 {
+    // Disable default claim mapping to preserve custom claims like "tid"
+    options.MapInboundClaims = false;
+
     options.TokenValidationParameters = new TokenValidationParameters
     {
         ValidateIssuer = true,
@@ -83,7 +87,10 @@ builder.Services.AddAuthentication(options =>
         ValidAudience = builder.Configuration["Jwt:Audience"],
         IssuerSigningKey = new SymmetricSecurityKey(
             Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Secret"] ??
-                throw new InvalidOperationException("JWT secret not configured")))
+                throw new InvalidOperationException("JWT secret not configured"))),
+        // Preserve claim names as-is (don't map to Microsoft claim types)
+        NameClaimType = "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier",
+        RoleClaimType = "role"
     };
 })
 .AddScheme<AuthenticationSchemeOptions, ApiKeyAuthenticationHandler>(
